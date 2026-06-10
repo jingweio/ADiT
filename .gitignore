@@ -6,6 +6,12 @@ dataset/
 ckpts/
 *.pkl
 
+# reproduce/ 复现工作:排除运行产物与自动生成物(只跟踪脚本/文档/图/分析CSV)
+claude_conversation.md
+reproduce/*.log
+reproduce/.conversation_updater.pid
+.ipynb_checkpoints/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
