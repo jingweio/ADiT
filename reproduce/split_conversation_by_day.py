@@ -21,10 +21,9 @@ NOISE_MARKERS = (
     "Caveat: The messages below", "<command-name>", "<command-message>",
     "[SYSTEM NOTIFICATION", "## Exited Plan Mode",
     "推进 ADiT", "完成 ADiT", "ADiT LBA 复现最后一步", "每15分钟进度汇报",
-    # 自动轮询/监控的再触发 prompt(ScheduleWakeup 回灌的,不是用户真实提问;
-    # 且含大量 glob/`<i>` 等会破坏 markdown 的裸符号)
-    "监控并完成 ibex", "监控并完成",
 )
+# 注:不过滤自动监控 prompt —— 它们后面跟着的是真实的 OOD 进度/结果汇报(assistant),
+# 不能为了去噪把内容删掉。靠下面 esc_user() 的转义来防止排版被带歪(改格式,不删内容)。
 
 
 def esc_user(t):
