@@ -21,7 +21,24 @@ NOISE_MARKERS = (
     "Caveat: The messages below", "<command-name>", "<command-message>",
     "[SYSTEM NOTIFICATION", "## Exited Plan Mode",
     "推进 ADiT", "完成 ADiT", "ADiT LBA 复现最后一步", "每15分钟进度汇报",
+    # 自动轮询/监控的再触发 prompt(ScheduleWakeup 回灌的,不是用户真实提问;
+    # 且含大量 glob/`<i>` 等会破坏 markdown 的裸符号)
+    "监控并完成 ibex", "监控并完成",
 )
+
+
+def esc_user(t):
+    """转义用户消息里的 markdown/HTML 特殊字符,使其按字面渲染——
+    避免裸 `*`/`_`(强调)、`<i>`(HTML 斜体标签)、反引号等把整篇排版带歪。
+    用户消息是原始输入、本就不含预期 markdown,所以全部转义是安全的。"""
+    t = t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    out = []
+    for ch in t:
+        if ch in "\\`*_~#|":
+            out.append("\\" + ch)
+        else:
+            out.append(ch)
+    return "".join(out)
 
 
 def latest_transcript():
@@ -120,7 +137,7 @@ def main():
             if role == "user":
                 out.append("\n---\n")
                 out.append("### 👤 用户\n")
-                out.append(t)
+                out.append(esc_user(t))
             else:
                 out.append("\n### 🤖 Claude\n")
                 out.append(t)
