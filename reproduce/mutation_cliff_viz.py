@@ -187,19 +187,19 @@ for tag,vt,vp,hvt,hvp in [("mean",mt,mp,hi_mt,hi_mp),("median",mdt,mdp,hi_mdt,hi
     ax.set_title(f"(i-{tag}) predicted effect flattens as cliff grows"); ax.legend(fontsize=8)
     fig.tight_layout(); fig.savefig(os.path.join(OUT,f"adit_cliff_flatten_{tag}.png")); plt.close(fig)
 
-# ---- §4 (ii):只画 RMSE,overall 与 per-interface 合并一张(ddG 与 ΔΔΔG)----
-styles={"a":("ΔΔΔG overall","crimson","-"),"b":("ΔΔΔG per-interface","crimson",":"),
-        "c":("ΔΔG overall","navy","-"),"d":("ΔΔG per-interface","navy",":")}
-fig,ax=plt.subplots(figsize=(7.2,4.4))
-for k,(lb,c_,ls_) in styles.items():
-    ax.plot(ctr,res[k]["R"],ls_,c=c_,lw=1.8,label=lb)
-    ax.plot([HIX],[hmo[k][2]],"*",ms=12,c=c_)
-ax.axvline(TOP,ls=":",c="grey",lw=1)
-ax.set_xlim(0,2.12); ax.set_xticks([0,0.5,1,1.5,2,HIX]); ax.set_xticklabels(["0","0.5","1","1.5","2","★>2"])
-ax.set_xlabel("SALI = cliff severity (|ΔΔΔG|/d)"); ax.set_ylabel("RMSE (kcal/mol, ↓ = better)")
-ax.set_title("RMSE rises monotonically as cliff severity grows → model gets worse")
-ax.legend(fontsize=9)
-fig.tight_layout(); fig.savefig(os.path.join(OUT,"adit_cliff_rmse.png")); plt.close(fig)
+# ---- §4 (ii):只画 RMSE;ΔΔΔG 与 ΔΔG 各一张(每张含 overall + per-interface)----
+for tag,(ko,kp,col) in {"dddg":("a","b","crimson"),"ddg":("c","d","navy")}.items():
+    lbl="ΔΔΔG" if tag=="dddg" else "ΔΔG"
+    fig,ax=plt.subplots(figsize=(6.2,4.0))
+    ax.plot(ctr,res[ko]["R"],"-",c=col,lw=1.9,label=f"{lbl} overall")
+    ax.plot(ctr,res[kp]["R"],":",c=col,lw=1.9,label=f"{lbl} per-interface")
+    ax.plot([HIX],[hmo[ko][2]],"*",ms=13,c=col); ax.plot([HIX],[hmo[kp][2]],"*",ms=13,c=col)
+    ax.axvline(TOP,ls=":",c="grey",lw=1)
+    ax.set_xlim(0,2.12); ax.set_xticks([0,0.5,1,1.5,2,HIX]); ax.set_xticklabels(["0","0.5","1","1.5","2","★>2"])
+    ax.set_xlabel("SALI = cliff severity (|ΔΔΔG|/d)"); ax.set_ylabel(f"{lbl} RMSE (kcal/mol, ↓ = better)")
+    ax.set_title(f"{lbl} RMSE rises as cliff severity grows → model worse")
+    ax.legend(fontsize=9)
+    fig.tight_layout(); fig.savefig(os.path.join(OUT,f"adit_cliff_rmse_{tag}.png")); plt.close(fig)
 
 # ---- 0.1 粒度明细表(md 用):每个 fine 桶 + >2 ----
 cnt=np.array([len(groups[i]) if i in groups else 0 for i in range(n)])
