@@ -137,6 +137,12 @@
 - **正常组**: 两个相近替换的真值 ddG 本就接近(跳变 <0.3),模型也预测出接近的小跳变——没有 cliff、模型表现正常。
 - **不正常组**: 同一位点换个 AA,真值 ddG 却差 4–8 kcal/mol(典型 cliff),而模型预测的跳变要么被压扁到接近 0、要么方向判反——**完全没抓住 cliff**。这些位点都是**蛋白酶-抑制剂的 P1 类热点**(1PPF/I18、1CHO/I15、1R0R/I10、2FTL/I15、2JEL/P34)。
 
+**d=1 全体的预测跳变误差分布**: 在所有 d=1 对(n=9225)上,`|预测跳变 − 真值跳变|` 的范围是 **[0.00, 14.04] kcal/mol**,
+mean 1.19 / median 0.85 / p90 2.63 / p99 5.83;**32.9% 的对 <0.5(预测准),但 17.4% >2、3.3% >4(严重失配)**。
+分布呈**长右尾**——多数 d=1 对预测尚可,但拖着一条粗重的"严重失配"尾巴(即上面"不正常组"那类 cliff)。
+
+<img src="mutation_analysis/d1_jumperr_hist.png" width="480">
+
 ## 5. 产物
 - 数据: `skempi_per_sample_pred.csv`、`skempi_mutation_cliff_pairs.csv`、`skempi_same_site_groups.csv`、
   `skempi_cliff_pairs_SALI_top2000.csv`;**全配对表 `mutation_analysis/sali_pairs_table.csv`(270,608 行)**。
