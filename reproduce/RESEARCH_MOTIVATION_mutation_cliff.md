@@ -147,7 +147,7 @@ mean 1.19 / median 0.85 / p90 2.61 / p99 5.83;**32.7% 的对 <0.5(预测准),但
 - 数据: `skempi_per_sample_pred.csv`、`skempi_mutation_cliff_pairs.csv`、`skempi_same_site_groups.csv`、
   `skempi_cliff_pairs_SALI_top2000.csv`;**全配对表 `mutation_analysis/sali_pairs_table.csv`(289,200 行)**。
 - 图(`mutation_analysis/`): `ecdf_sali_combined.png`/`ecdf_sali_by_d.png`(Evidence 1)、`qmean_sali_combined.png`/`qmean_sali_by_d.png`(Evidence 2)、`pointcloud_sali_by_d.png`(Evidence 3)、`adit_cliff_flatten_mean.png`/`adit_cliff_flatten_median.png`(§4.1-i)、`adit_cliff_rmse_dddg.png`/`adit_cliff_rmse_ddg.png`(§4.1-ii)、`d1_jumperr_hist.png`(§4.2)。
-- 图(根目录,早期版本/旁证): `fig_cliff_vs_noise.png`、`fig_jump_true_vs_pred.png`、`fig_jump_saturation.png`、`fig_absT_by_distance.png`。
+- 图(根目录,补充旁证,均为全量不采样口径): `fig_cliff_vs_noise.png`、`fig_jump_true_vs_pred.png`、`fig_jump_saturation.png`、`fig_absT_by_distance.png`。
 - 脚本: `mutation_cliff_analysis.py`、`mutation_cliff_extended.py`、`mutation_cliff_viz.py`。
 
 ## 6. 证伪记录: "cliff 越严重 → 排序/二分类表现越差"——多角度尝试均失败

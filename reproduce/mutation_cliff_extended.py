@@ -37,14 +37,10 @@ def dist(a, b):
             d += 1
     return d
 
-# 同界面任意配对(界面过大时采样以控规模)
-rng = np.random.default_rng(0)
-CAP = 250
+# 同界面任意配对(全量,不采样 —— 与 mutation_cliff_viz.py 口径一致)
 rows = []
 for name, g in agg.groupby("Name"):
     recs = g.to_dict("records")
-    if len(recs) > CAP:
-        recs = list(rng.choice(recs, CAP, replace=False))
     for a, b in itertools.combinations(recs, 2):
         d = dist(a["mdict"], b["mdict"])
         dT = a["ddG"] - b["ddG"]; dP = a["ddG_pred"] - b["ddG_pred"]
