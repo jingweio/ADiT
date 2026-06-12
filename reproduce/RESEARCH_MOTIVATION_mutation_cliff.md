@@ -77,20 +77,24 @@
 ### 4.1 随着 mutation cliff 程度增加,模型效果逐渐下降
 按 cliff 指数 SALI 分桶(0–4 细分 + >4),桶号越大 = cliff 越陡。
 
-**(i) 幅度 flatten:真值 effect 一路爬升,预测 effect 跟不上**
-<img src="mutation_analysis/adit_cliff_flatten.png" width="500">
+**(i) 幅度 flatten:真值 effect 一路爬升,预测 effect 跟不上**(SALI 细分桶,step=0.1,0–4)
+<table><tr>
+<td><img src="mutation_analysis/adit_cliff_flatten_mean.png" width="420"></td>
+<td><img src="mutation_analysis/adit_cliff_flatten_median.png" width="420"></td>
+</tr></table>
 
-| 真值 SALI 桶(cliff 严重度) | n | 真值 \|ΔΔΔG\| mean | 预测 \|ΔΔΔG\| mean |
-|---|---|---|---|
-| 0–0.5 | 146,700 | 0.79 | 1.13 |
-| 0.5–1 | 60,651 | 2.43 | 1.72 |
-| 1–1.5 | 30,467 | 3.36 | 2.01 |
-| 1.5–2 | 15,801 | 4.16 | 2.61 |
-| 2–3 | 12,920 | 5.27 | 3.04 |
-| 3–4 | 2,982 | 6.44 | 3.79 |
-| >4 | 1,087 | 7.12 | 4.38 |
+| 真值 SALI 桶(cliff 严重度) | n | 真值 mean | 预测 mean | 真值 median | 预测 median |
+|---|---|---|---|---|---|
+| 0–0.5 | 146,700 | 0.79 | 1.13 | 0.53 | 0.71 |
+| 0.5–1 | 60,651 | 2.43 | 1.72 | 1.82 | 1.10 |
+| 1–1.5 | 30,467 | 3.36 | 2.01 | 2.81 | 1.41 |
+| 1.5–2 | 15,801 | 4.16 | 2.61 | 3.64 | 1.98 |
+| 2–3 | 12,920 | 5.27 | 3.04 | 4.92 | 2.51 |
+| 3–4 | 2,982 | 6.44 | 3.79 | 6.51 | 3.35 |
+| >4 | 1,087 | 7.12 | 4.38 | 8.01 | 4.16 |
 
-→ cliff 越陡,真值 effect climb 到 7.1,但**预测 effect 被压在低位(到 4.4 就上不去)**,两柱差距越拉越大——模型把悬崖"抹平"。
+→ cliff 越陡,真值 effect 爬到 7+,但**预测 effect 被压在低位(到 ~4 就上不去)**,真值与预测的差距越拉越大——模型把悬崖"抹平"。
+mean 与 median 两条曲线趋势一致(median 在高 SALI 区差距更夸张:真值 8.0 vs 预测 4.2),说明 flatten 不是少数离群点造成的。
 
 **(ii) 按 SALI 分桶的 12 个模型指标:哪个能反映"cliff 越严重越差"?**
 对每个 SALI 桶分别算 (a) ΔΔΔG overall、(b) ΔΔΔG per-interface、(c) ΔΔG overall、(d) ΔΔG per-interface 的
@@ -137,6 +141,6 @@
 ## 5. 产物
 - 数据:`skempi_per_sample_pred.csv`、`skempi_mutation_cliff_pairs.csv`、`skempi_same_site_groups.csv`、
   `skempi_cliff_pairs_SALI_top2000.csv`;**全配对表 `mutation_analysis/sali_pairs_table.csv`(270,608 行)**。
-- 图(`mutation_analysis/`):`ecdf_sali_combined.png`/`ecdf_sali_by_d.png`(Evidence 1)、`qmean_sali_combined.png`/`qmean_sali_by_d.png`(Evidence 2)、`pointcloud_sali_by_d.png`(Evidence 3)、`adit_cliff_flatten.png`(§4.1-i)、`adit_cliff_metrics.png`(§4.1-ii)。
+- 图(`mutation_analysis/`):`ecdf_sali_combined.png`/`ecdf_sali_by_d.png`(Evidence 1)、`qmean_sali_combined.png`/`qmean_sali_by_d.png`(Evidence 2)、`pointcloud_sali_by_d.png`(Evidence 3)、`adit_cliff_flatten_mean.png`/`adit_cliff_flatten_median.png`(§4.1-i)、`adit_cliff_metrics.png`(§4.1-ii)。
 - 图(根目录,早期版本/旁证):`fig_cliff_vs_noise.png`、`fig_jump_true_vs_pred.png`、`fig_jump_saturation.png`、`fig_absT_by_distance.png`。
 - 脚本:`mutation_cliff_analysis.py`、`mutation_cliff_extended.py`、`mutation_cliff_viz.py`。

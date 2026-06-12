@@ -125,33 +125,15 @@ for d in DS:
 print("ALL:",{k:(round(v,3) if k!='n' else int(v)) for k,v in block(P.SALI).items()})
 print(f"corr(d, SALI): Pearson={pearsonr(P.d,P.SALI)[0]:.3f} Spearman={spearmanr(P.d,P.SALI)[0]:.3f}")
 
-# ======================= §4 按 SALI(cliff 严重度)分桶 =======================
-sedges=[0,0.5,1,1.5,2,3,4,1e9]
-slab=["0-.5",".5-1","1-1.5","1.5-2","2-3","3-4",">4"]
-P["sbin"]=pd.cut(P.SALI,sedges,labels=slab,right=False)
-xs=np.arange(len(slab))
-
-# ---- §4 fig1:真值 vs 预测 |ΔΔΔG| 的 mean(flatten)----
-m_true=[P[P.sbin==L].absT.mean() for L in slab]
-m_pred=[P[P.sbin==L].absP.mean() for L in slab]
-print("\n=== §4 fig1: 真值 vs 预测 |ΔΔΔG| mean ===")
-for L,t,p in zip(slab,m_true,m_pred): print(f"  {L}: true {t:.2f} pred {p:.2f}")
-w=0.4
-fig,ax=plt.subplots(figsize=(6.0,3.9))
-ax.bar(xs-w/2,m_true,w,color="indianred",label="true |ΔΔΔG| (mean)")
-ax.bar(xs+w/2,m_pred,w,color="steelblue",label="predicted |ΔΔΔG| (mean)")
-ax.set_xticks(xs); ax.set_xticklabels(slab,rotation=45)
-ax.set_xlabel("true SALI bin = cliff severity"); ax.set_ylabel("|ΔΔΔG| (mean, kcal/mol)")
-ax.set_title("As cliff severity grows, predicted effect lags true (flatten)"); ax.legend(fontsize=8)
-fig.tight_layout(); fig.savefig(os.path.join(OUT,"adit_cliff_flatten.png")); plt.close(fig)
-
-# ---- §4 fig2:12 个模型指标(a/b/c/d × Pearson/Spearman/RMSE)----
+# ======================= §4 按 SALI 细分桶(step=0.1)=======================
 def rmse(x,y): return float(np.sqrt(np.mean((np.asarray(x)-np.asarray(y))**2)))
 def safe(f,x,y):
     x,y=np.asarray(x),np.asarray(y)
     if len(x)<3 or np.std(x)==0 or np.std(y)==0: return np.nan
     return f(x,y)[0]
-KP=10
+KP=10            # per-interface: 每个 complex 至少 KP 个样本
+MINN=40          # 每个 fine bin 至少 MINN 对才计点
+MINIF=3          # per-interface: 至少 MINIF 个合格 complex 才计点
 def perif(d,gcol,xc,yc):
     pe,sp,rm=[],[],[]
     for _,gg in d.groupby(gcol):
@@ -159,35 +141,53 @@ def perif(d,gcol,xc,yc):
         pe.append(safe(pearsonr,gg[xc].values,gg[yc].values))
         sp.append(safe(spearmanr,gg[xc].values,gg[yc].values))
         rm.append(rmse(gg[xc],gg[yc]))
-    f=lambda v:np.nanmean(v) if len(v) else np.nan
-    return f(pe),f(sp),f(rm),sum(~np.isnan(pe)) if pe else 0
+    n=sum(~np.isnan(pe)) if pe else 0
+    f=lambda v:(np.nanmean(v) if n>=MINIF else np.nan)
+    return f(pe),f(sp),f(rm),n
 
-res={k:{m:[] for m in ["P","S","R"]} for k in "abcd"}
-nif={"b":[],"d":[]}
-print("\n=== §4 fig2: 12 指标 by SALI 桶 ===")
-for L in slab:
-    q=P[P.sbin==L]
-    res["a"]["P"].append(safe(pearsonr,q.true_jump,q.pred_jump)); res["a"]["S"].append(safe(spearmanr,q.true_jump,q.pred_jump)); res["a"]["R"].append(rmse(q.true_jump,q.pred_jump))
-    bp,bs,br,bn=perif(q,"PDB","true_jump","pred_jump"); res["b"]["P"].append(bp); res["b"]["S"].append(bs); res["b"]["R"].append(br); nif["b"].append(bn)
+BW=0.1; TOP=4.0
+fedges=np.round(np.arange(0,TOP+1e-9,BW),2); ctr=fedges[:-1]+BW/2
+P["fb"]=pd.cut(P.SALI,fedges,labels=False,right=False)
+groups={int(k):v for k,v in P.dropna(subset=["fb"]).groupby("fb")}
+n=len(ctr)
+mt=np.full(n,np.nan); mp=np.full(n,np.nan); mdt=np.full(n,np.nan); mdp=np.full(n,np.nan)
+res={k:{m:np.full(n,np.nan) for m in "PSR"} for k in "abcd"}
+for i in range(n):
+    q=groups.get(i)
+    if q is None or len(q)<MINN: continue
+    mt[i]=q.absT.mean(); mp[i]=q.absP.mean(); mdt[i]=q.absT.median(); mdp[i]=q.absP.median()
+    res["a"]["P"][i]=safe(pearsonr,q.true_jump,q.pred_jump); res["a"]["S"][i]=safe(spearmanr,q.true_jump,q.pred_jump); res["a"]["R"][i]=rmse(q.true_jump,q.pred_jump)
+    bP,bS,bR,_=perif(q,"PDB","true_jump","pred_jump"); res["b"]["P"][i]=bP; res["b"]["S"][i]=bS; res["b"]["R"][i]=bR
     ids=pd.unique(pd.concat([q.iA,q.iB])); M=agg.loc[ids,["Name","ddG","ddG_pred"]]
-    res["c"]["P"].append(safe(pearsonr,M.ddG,M.ddG_pred)); res["c"]["S"].append(safe(spearmanr,M.ddG,M.ddG_pred)); res["c"]["R"].append(rmse(M.ddG,M.ddG_pred))
-    dp,ds,dr,dn=perif(M,"Name","ddG","ddG_pred"); res["d"]["P"].append(dp); res["d"]["S"].append(ds); res["d"]["R"].append(dr); nif["d"].append(dn)
-    print(f"  {L}: a {res['a']['P'][-1]:.2f}/{res['a']['S'][-1]:.2f}/{res['a']['R'][-1]:.2f} | "
-          f"b {bp:.2f}/{bs:.2f}/{br:.2f} | c {res['c']['P'][-1]:.2f}/{res['c']['S'][-1]:.2f}/{res['c']['R'][-1]:.2f} | d {dp:.2f}/{ds:.2f}/{dr:.2f}")
+    res["c"]["P"][i]=safe(pearsonr,M.ddG,M.ddG_pred); res["c"]["S"][i]=safe(spearmanr,M.ddG,M.ddG_pred); res["c"]["R"][i]=rmse(M.ddG,M.ddG_pred)
+    dP,dS,dR,_=perif(M,"Name","ddG","ddG_pred"); res["d"]["P"][i]=dP; res["d"]["S"][i]=dS; res["d"]["R"][i]=dR
+nval={k:int(np.sum(~np.isnan(res[k]["P"]))) for k in "abcd"}
+print(f"\n=== §4 fine bins: {n} 个(step={BW}, 0–{TOP}) | 有效点 a/b/c/d = {nval} ===")
+for i in range(0,n,5):
+    print(f"  SALI~{ctr[i]:.2f}: true {mt[i]:.2f}/pred {mp[i]:.2f} | a-RMSE {res['a']['R'][i]:.2f} c-RMSE {res['c']['R'][i]:.2f} d-RMSE {res['d']['R'][i]:.2f}")
 
+# ---- §4 (i):flatten,mean 与 median 两张图 ----
+for tag,vt,vp in [("mean",mt,mp),("median",mdt,mdp)]:
+    fig,ax=plt.subplots(figsize=(5.8,3.8))
+    ax.plot(ctr,vt,c="indianred",lw=1.9,label=f"true |ΔΔΔG| ({tag})")
+    ax.plot(ctr,vp,c="steelblue",lw=1.9,label=f"predicted |ΔΔΔG| ({tag})")
+    ax.fill_between(ctr,vp,vt,where=~np.isnan(vt),color="orange",alpha=0.15)
+    ax.set_xlabel("SALI = cliff severity (|ΔΔΔG|/d)"); ax.set_ylabel(f"|ΔΔΔG| ({tag}, kcal/mol)")
+    ax.set_title(f"(i-{tag}) predicted effect flattens as cliff grows"); ax.legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(os.path.join(OUT,f"adit_cliff_flatten_{tag}.png")); plt.close(fig)
+
+# ---- §4 (ii):12 指标(a/b/c/d × P/S/RMSE),fine bins ----
 titles={"a":"(a) ΔΔΔG overall","b":"(b) ΔΔΔG per-interface","c":"(c) ΔΔG overall","d":"(d) ΔΔG per-interface"}
 fig,axes=plt.subplots(2,2,figsize=(11,7.4))
 for ax,k in zip(axes.flat,"abcd"):
-    ax.plot(xs,res[k]["P"],"-o",c="crimson",lw=1.7,ms=4,label="Pearson")
-    ax.plot(xs,res[k]["S"],"-s",c="navy",lw=1.7,ms=4,label="Spearman")
-    ax.set_ylim(0,1); ax.set_xticks(xs); ax.set_xticklabels(slab,rotation=45)
-    ax.set_ylabel("correlation (↑=better)"); ax.set_title(titles[k]); ax.axhline(0,ls=":",c="grey")
-    axr=ax.twinx(); axr.plot(xs,res[k]["R"],"-^",c="darkorange",lw=1.7,ms=4,label="RMSE")
-    axr.set_ylabel("RMSE (↓=better)")
+    ax.plot(ctr,res[k]["P"],"-",c="crimson",lw=1.6,label="Pearson")
+    ax.plot(ctr,res[k]["S"],"-",c="navy",lw=1.6,label="Spearman")
+    ax.set_ylim(0,1); ax.set_ylabel("correlation (↑=better)"); ax.set_title(titles[k]); ax.axhline(0,ls=":",c="grey")
+    axr=ax.twinx(); axr.plot(ctr,res[k]["R"],"-",c="darkorange",lw=1.6,label="RMSE"); axr.set_ylabel("RMSE (↓=better)")
     h1,l1=ax.get_legend_handles_labels(); h2,l2=axr.get_legend_handles_labels()
-    ax.legend(h1+h2,l1+l2,fontsize=7.5,loc="upper left")
-    ax.set_xlabel("true SALI bin = cliff severity")
-fig.suptitle("Per-SALI-bin model metrics: correlations RISE (SNR artifact), only RMSE rises=worse",fontsize=11)
+    ax.legend(h1+h2,l1+l2,fontsize=7.5,loc="center left")
+    ax.set_xlabel("SALI = cliff severity")
+fig.suptitle("Per-SALI-bin (step=0.1) metrics: correlations RISE (SNR artifact), only RMSE rises=worse",fontsize=11)
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"adit_cliff_metrics.png")); plt.close(fig)
 
 # ======================= 表:diff_percent =======================
