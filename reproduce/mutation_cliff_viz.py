@@ -229,15 +229,15 @@ print(ext[["PDB","site","d","ddG_A","ddG_B","true_jump","pred_jump","diff_percen
 d1e=P[P.d==1].copy(); d1e["jerr"]=(d1e.pred_jump-d1e.true_jump).abs()
 print(f"\n=== d=1 |pred_jump−true_jump| 分布: n={len(d1e)} range[{d1e.jerr.min():.2f},{d1e.jerr.max():.2f}] "
       f"mean={d1e.jerr.mean():.2f} median={d1e.jerr.median():.2f} p90={d1e.jerr.quantile(.9):.2f} p99={d1e.jerr.quantile(.99):.2f} ===")
-# 分桶:[0,2) step=0.1(20 桶)+ 一个 >2 桶;y 轴为占比(%)
-hedges=[round(0.1*i,1) for i in range(21)]+[1e9]
+# 分桶:[0,4) step=0.1(40 桶)+ 一个 >4 桶;y 轴为占比(%)
+hedges=[round(0.1*i,1) for i in range(41)]+[1e9]
 hcnt=np.histogram(d1e.jerr.values,bins=hedges)[0]
 hpct=100*hcnt/len(d1e)
 hxs=np.arange(len(hpct))
-fig,ax=plt.subplots(figsize=(7.6,3.9))
+fig,ax=plt.subplots(figsize=(8.6,3.9))
 ax.bar(hxs,hpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3)
-ax.set_xticks([0,5,10,15,20]); ax.set_xticklabels(["0","0.5","1.0","1.5",">2"])
-ax.set_xlabel("|predicted jump − true jump| (kcal/mol, d=1; bin=0.1 in [0,2], last bar = >2)")
+ax.set_xticks([0,10,20,30,40]); ax.set_xticklabels(["0","1","2","3",">4"])
+ax.set_xlabel("|predicted jump − true jump| (kcal/mol, d=1; bin=0.1 in [0,4], last bar = >4)")
 ax.set_ylabel("percentage of d=1 pairs (%)")
-ax.set_title(f"d=1 jump-prediction error (n={len(d1e)}; median={d1e.jerr.median():.2f}, p90={d1e.jerr.quantile(.9):.2f}, >2={100*(d1e.jerr>2).mean():.1f}%)")
+ax.set_title(f"d=1 jump-prediction error (n={len(d1e)}; median={d1e.jerr.median():.2f}, p90={d1e.jerr.quantile(.9):.2f}, >4={100*(d1e.jerr>4).mean():.1f}%)")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_jumperr_hist.png")); plt.close(fig)
