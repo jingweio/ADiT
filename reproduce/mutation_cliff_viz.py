@@ -145,7 +145,7 @@ def perif(d,gcol,xc,yc):
     f=lambda v:(np.nanmean(v) if n>=MINIF else np.nan)
     return f(pe),f(sp),f(rm),n
 
-BW=0.01; TOP=2.0; HIX=2.05      # [0,2) step=0.01 细桶 + 一个 >2 聚合点(画在 x=2.05)
+BW=0.1; TOP=2.0; HIX=2.05       # [0,2) step=0.1 细桶 + 一个 >2 聚合点(画在 x=2.05)
 fedges=np.round(np.arange(0,TOP+1e-9,BW),2); ctr=fedges[:-1]+BW/2
 P["fb"]=pd.cut(P.SALI,fedges,labels=False,right=False)
 groups={int(k):v for k,v in P.dropna(subset=["fb"]).groupby("fb")}
@@ -205,15 +205,20 @@ for ax,k in zip(axes.flat,"abcd"):
 fig.suptitle("Per-SALI-bin (step=0.01, 0–2) + >2: correlations RISE (SNR artifact), only RMSE rises=worse",fontsize=11)
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"adit_cliff_metrics.png")); plt.close(fig)
 
-# ---- coarse 汇总表(md 用): 0-.5,.5-1,1-1.5,1.5-2,>2 ----
-cedges=[0,0.5,1,1.5,2,1e9]; clab=["0-.5",".5-1","1-1.5","1.5-2",">2"]
-P["cb"]=pd.cut(P.SALI,cedges,labels=clab,right=False)
-print("\n=== §4 coarse 汇总(table 用)===")
-for L in clab:
-    q=P[P.cb==L]; mo,M=metrics_of(q)
-    print(f"  {L}: n={len(q)} | true {q.absT.mean():.2f}/{q.absT.median():.2f} pred {q.absP.mean():.2f}/{q.absP.median():.2f} "
-          f"| a {mo['a'][0]:.2f}/{mo['a'][1]:.2f}/{mo['a'][2]:.2f} | b {mo['b'][0]:.2f}/{mo['b'][1]:.2f}/{mo['b'][2]:.2f} "
-          f"| c {mo['c'][0]:.2f}/{mo['c'][1]:.2f}/{mo['c'][2]:.2f} | d {mo['d'][0]:.2f}/{mo['d'][1]:.2f}/{mo['d'][2]:.2f}")
+# ---- 0.1 粒度明细表(md 用):每个 fine 桶 + >2 ----
+cnt=np.array([len(groups[i]) if i in groups else 0 for i in range(n)])
+print("\n=== §4.1 (i) flatten 明细表(0.1 粒度)markdown ===")
+for i in range(n):
+    if np.isnan(mt[i]): continue
+    print(f"| {fedges[i]:.1f}–{fedges[i+1]:.1f} | {cnt[i]:,} | {mt[i]:.2f} | {mp[i]:.2f} | {mdt[i]:.2f} | {mdp[i]:.2f} |")
+print(f"| **>2** | {len(HI):,} | {hi_mt:.2f} | {hi_mp:.2f} | {hi_mdt:.2f} | {hi_mdp:.2f} |")
+print("\n=== §4.1 (ii) 12 指标明细表(0.1 粒度)markdown ===")
+for i in range(n):
+    if np.isnan(res['a']['P'][i]): continue
+    r=lambda k:f"{res[k]['P'][i]:.2f}/{res[k]['S'][i]:.2f}/{res[k]['R'][i]:.2f}"
+    print(f"| {fedges[i]:.1f}–{fedges[i+1]:.1f} | {r('a')} | {r('b')} | {r('c')} | {r('d')} |")
+hr=lambda k:f"{hmo[k][0]:.2f}/{hmo[k][1]:.2f}/{hmo[k][2]:.2f}"
+print(f"| **>2** | {hr('a')} | {hr('b')} | {hr('c')} | {hr('d')} |")
 
 # ======================= 表:diff_percent =======================
 P["diff_percent"]=(P.pred_jump-P.true_jump)/P.true_jump.replace(0,np.nan)
