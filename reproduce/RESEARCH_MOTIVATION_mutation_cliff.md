@@ -139,8 +139,9 @@
 **d=1 全体的预测跳变误差分布**: 在所有 d=1 对(n=10078)上,`|预测跳变 − 真值跳变|` 的范围是 **[0.00, 14.04] kcal/mol**,
 mean 1.19 / median 0.85 / p90 2.61 / p99 5.83;**32.7% 的对 <0.5(预测准),但 17.3% >2、3.3% >4(严重失配)**。
 分布呈**长右尾**——多数 d=1 对预测尚可,但拖着一条粗重的"严重失配"尾巴(即上面"不正常组"那类 cliff)。
+(下图: 误差按 [0,2) 间隔 0.1 分桶、>2 聚成最后一根柱;纵轴为占全部 d=1 对的百分比,故 >2 那根柱即 17.3%。)
 
-<img src="mutation_analysis/d1_jumperr_hist.png" width="480">
+<img src="mutation_analysis/d1_jumperr_hist.png" width="520">
 
 ## 5. 产物
 - 数据: `skempi_per_sample_pred.csv`、`skempi_mutation_cliff_pairs.csv`、`skempi_same_site_groups.csv`、
