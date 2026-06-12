@@ -25,7 +25,7 @@ export GPU=1                                  # nvidia-smi 的 1 号卡 = RTX A4
 # ----------------------------------------------------------------------------
 # 步骤 A（必需，任何 skempi 训练/测试之前先跑一次）。
 # 为每个 SKEMPI 复合物（野生型 wt + 突变型 mt）预计算冻结的 ESM-2 表征，
-# 存到 dataset/skempi_esm_repr/{wt,mt}_<code>.pt。SkempiModule 直接读这些文件，
+# 存到 dataset/skempi_esm_repr_a100/{wt,mt}_<code>.pt（canonical = a100 重算版；A4500 旧版已删）。SkempiModule 直接读这些文件，
 # 而不是每一步都重跑 ESM（同一个 wt/mt 蛋白会被很多突变复用，预计算省很多时间）。
 # 耗时约 1 小时（~6.7k 个复合物）。
 #   （脚本里还会调用 main_HER2()；因为没下载 HER2 数据，这部分是空操作——

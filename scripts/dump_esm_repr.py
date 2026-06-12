@@ -63,9 +63,9 @@ def main_skempi():
     esm_model = 'ESM-2-650M'
     esm_encoder = esm.ESM(path = esm_weight_path, model = esm_model).to(device)
 
-    # 输出目录可经环境变量覆盖(默认 dataset/skempi_esm_repr);用于在 ibex/a100 上重算到新版本目录
-    # 而不覆盖旧版本(本地 A4500 算的)。e.g. SKEMPI_ESM_SAVE_DIR=dataset/skempi_esm_repr_a100
-    save_dir = os.environ.get("SKEMPI_ESM_SAVE_DIR", "dataset/skempi_esm_repr")
+    # 输出目录可经环境变量覆盖。canonical = a100-recomputed (dataset/skempi_esm_repr_a100);
+    # A4500 旧版 dataset/skempi_esm_repr 已删除(防数据混淆)。重算请在 a100 上跑。
+    save_dir = os.environ.get("SKEMPI_ESM_SAVE_DIR", "dataset/skempi_esm_repr_a100")
     os.makedirs(save_dir, exist_ok=True)
     for fpath in tqdm.tqdm(data_path):
         a_code = access_code(fpath)
