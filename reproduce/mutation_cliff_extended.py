@@ -86,23 +86,33 @@ print(f"高SALI(>2)对数: {len(hi)} ({100*len(hi)/len(P):.1f}%) | 其中模型�
 # ===================== 出图 =====================
 plt.rcParams.update({"figure.dpi":130, "font.size":10})
 
-# 图1:噪声下界 vs 同位点ΔΔG跨度(ECDF)
+# 图1:同位点 cliff 跨度 vs 该位点内"同AA重测"噪声(site-matched ECDF)
+# —— 两条曲线【共用同一批 (Name, site) cliff 位点】,只是 ΔΔG range 的计算范围不同:
+#    cliff = 同位点跨【不同替换AA】的 ddG range;noise = 同位点【同一个AA、跨不同次记录】的 ddG range。
+#    这样排除了"这些位点本身难测/噪声大"的替代解释(配对对照,比全数据任意重复更硬)。
 s = df[df.num_mutation_sites==1].copy()
 s["m"]=s["mut_list"].apply(lambda l:l[0])
 s["site"]=s["m"].apply(lambda x:x[1:-1])
-# 噪声:相同突变(同 Name 同 mut)重复测量的 ddG range,仅取 ≥2 次的组
-rg = s.groupby(["Name","m"]).ddG.agg(["size", lambda x: x.max()-x.min()])
-rg.columns=["n","rng"]; noise = rg.loc[rg.n>=2,"rng"]
-# cliff:去重到 distinct 单点突变后,同位点(同 Name 同 site)≥2 个不同AA 的 ddG range
+# cliff:同突变重复先平均 → 同位点(同 Name 同 site)≥2 个不同AA 的 ddG range
 dstd = s.groupby(["Name","m"],as_index=False).agg(ddG=("ddG","mean"))
 dstd["site"]=dstd.m.apply(lambda x:x[1:-1])
 sg = dstd.groupby(["Name","site"]).ddG.agg(["size", lambda x: x.max()-x.min()])
-sg.columns=["k","rng"]; sgrp = sg.loc[sg.k>=2,"rng"]
-fig,ax=plt.subplots(figsize=(5,3.5))
-for data,lab in [(noise.values,"same mutation (noise floor)"),(sgrp.values,"same site, diff AA (cliff)")]:
+sg.columns=["k","rng"]; cliff = sg.loc[sg.k>=2,"rng"]
+sites_cliff = set(sg.index[sg.k>=2])                       # 这批 cliff 位点 (Name, site)
+# noise(site-matched):仅在上述 cliff 位点内,同一个AA(同 Name 同 m)重测 ≥2 次的 ddG range
+s["ns_key"]=list(zip(s.Name, s.site))
+ins = s[s.ns_key.isin(sites_cliff)]
+rg = ins.groupby(["Name","m"]).ddG.agg(["size", lambda x: x.max()-x.min()])
+rg.columns=["n","rng"]; noise = rg.loc[rg.n>=2,"rng"]
+print("\n" + "="*78); print("图1 site-matched 对照(同一批 cliff 位点上的两种 ΔΔG range)"); print("="*78)
+print(f"  noise(同位点·同AA重测): n={len(noise)} median={noise.median():.3f} p90={noise.quantile(.9):.3f} >2占比={100*(noise>2).mean():.1f}%")
+print(f"  cliff(同位点·不同AA)  : n={len(cliff)} median={cliff.median():.3f} p90={cliff.quantile(.9):.3f} >2占比={100*(cliff>2).mean():.1f}%")
+fig,ax=plt.subplots(figsize=(5.2,3.5))
+for data,lab in [(noise.values,"same site, same AA — re-measurement (noise)"),
+                 (cliff.values,"same site, diff AA — substitution (cliff)")]:
     x=np.sort(data); y=np.arange(1,len(x)+1)/len(x); ax.plot(x,y,label=f"{lab} (n={len(x)})")
-ax.set_xlabel("ΔΔG range within group (kcal/mol)"); ax.set_ylabel("ECDF"); ax.set_xlim(0,6)
-ax.axvline(2,ls=":",c="grey"); ax.legend(); ax.set_title("Cliffs far exceed label-noise floor")
+ax.set_xlabel("ΔΔG range within the SAME site (kcal/mol)"); ax.set_ylabel("ECDF"); ax.set_xlim(0,6)
+ax.axvline(2,ls=":",c="grey"); ax.legend(fontsize=7.5); ax.set_title("Same sites: AA substitution >> re-measurement noise")
 fig.tight_layout(); fig.savefig(os.path.join(D,"fig_cliff_vs_noise.png")); plt.close(fig)
 
 # 图2:|ΔΔΔG真| vs |ΔΔΔG预测|(d=1 同界面近邻),y=x
