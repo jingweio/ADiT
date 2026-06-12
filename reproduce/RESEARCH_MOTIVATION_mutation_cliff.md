@@ -143,6 +143,12 @@ mean 1.19 / median 0.85 / p90 2.61 / p99 5.83;**32.7% 的对 <0.5(预测准),但
 
 <img src="mutation_analysis/d1_jumperr_hist.png" width="520">
 
+**同一分桶下,每个误差桶内"真值跳变 vs 预测跳变 符号相反"的占比**: 误差越大,符号判反的比例越高——
+从最小误差桶([0,0.1))的 **6%** 升到误差 ~1.5 起的 **~45–50%**,>4 误差桶达 **59%**。说明**大误差不只是幅度压扁,
+相当一部分直接把方向也判反**(尤其误差 >1.5 时近半数是符号相反)。
+
+<img src="mutation_analysis/d1_signflip_by_err.png" width="520">
+
 ## 5. 产物
 - 数据: `skempi_per_sample_pred.csv`、`skempi_mutation_cliff_pairs.csv`、`skempi_same_site_groups.csv`、
   `skempi_cliff_pairs_SALI_top2000.csv`;**全配对表 `mutation_analysis/sali_pairs_table.csv`(289,200 行)**。
