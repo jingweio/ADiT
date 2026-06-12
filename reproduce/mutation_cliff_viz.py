@@ -2,8 +2,8 @@
 """Mutation-cliff 深度可视化 + ADiT 失效系统验证。
 数据:SKEMPIv2 / ADiT-S 三折池化预测 reproduce/skempi_per_sample_pred.csv。
 口径:每个 complex 内 distinct mutant(同突变集合的重复测量先取均值)两两任意配对
-  (distinct mutant >250 的大 complex 做 CAP=250 随机采样, seed=0),d=两 mutant 序列逐点比对
-  的不同位点数, |ΔΔΔG|=真值 ddG 差, SALI=|ΔΔΔG|/d(cliff 指数);再 pool 全部 complex。
+  (全量,不采样),d=两 mutant 序列逐点比对的不同位点数, |ΔΔΔG|=真值 ddG 差,
+  SALI=|ΔΔΔG|/d(cliff 指数);再 pool 全部 complex。
 产出(reproduce/mutation_analysis/):
   §3  ecdf_sali_*, qmean_sali_*, pointcloud_sali_by_d        —— cliff 存在性(SALI)
   §4  adit_cliff_flatten.png   —— 真值 vs 预测 |ΔΔΔG|(mean)随 cliff 加剧 flatten
@@ -39,11 +39,9 @@ def dist(a, b):
 def diffpos(a, b):
     return ",".join(sorted(p for p in set(a) | set(b) if a.get(p) != b.get(p)))
 
-rng = np.random.default_rng(0); CAP = 250; rows = []
+rows = []   # 全量配对,不采样
 for name, g in agg.groupby("Name"):
     idx = list(g.index)
-    if len(idx) > CAP:
-        idx = list(rng.choice(idx, CAP, replace=False))
     for ia, ib in itertools.combinations(idx, 2):
         a, b = N[ia], N[ib]
         d = dist(a["mdict"], b["mdict"])
