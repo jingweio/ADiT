@@ -172,3 +172,95 @@
 - 图(`mutation_analysis/`):`ecdf_sali_combined.png`/`ecdf_sali_by_d.png`(Evidence 1)、`qmean_sali_combined.png`/`qmean_sali_by_d.png`(Evidence 2)、`pointcloud_sali_by_d.png`(Evidence 3)、`adit_cliff_flatten_mean.png`/`adit_cliff_flatten_median.png`(§4.1-i)、`adit_cliff_rmse.png`(§4.1-ii)。
 - 图(根目录,早期版本/旁证):`fig_cliff_vs_noise.png`、`fig_jump_true_vs_pred.png`、`fig_jump_saturation.png`、`fig_absT_by_distance.png`。
 - 脚本:`mutation_cliff_analysis.py`、`mutation_cliff_extended.py`、`mutation_cliff_viz.py`。
+
+## 6. 证伪记录:"cliff 越严重 → 排序/二分类表现越差"——多角度尝试均失败
+**背景**:mutation effect prediction 的主评测是 **affinity ranking**,所以我们曾想证明假设
+**H:「随 mutation cliff 程度加重,模型的(细粒度)ranking / 排序能力逐渐下降」**。从 6 个角度测试,**全部证伪**:
+排序/符号类指标在 cliff 上**不降反升**。本节如实记录全部尝试与数据,供后续避免重复走弯路。
+
+**统一的二分类指标定义(贯穿尝试 1–5)**:同一 complex 内无序 mutant 对 (A,B),`dT=ddG_A−ddG_B`(真值差)、
+`dP=pred_A−pred_B`(预测差)、`d`=突变距离、`SALI=|dT|/d`。只评估 `|dT|≥τ` 的"真值可区分对"。
+- **INVERTED(判反)**:`sign(dP)≠sign(dT)` 且 `|dP|≥ε`
+- **INDISTINCT(分不开)**:`|dP|<ε`(预测基本一致)
+- **Inversion rate** = INVERTED 占比;**Ordering-failure rate** = (INVERTED+INDISTINCT) 占比。
+
+### 尝试 1 — marginal:按 SALI 分桶,τ×ε 全网格(30 配置)
+对 `τ∈{0.1,0.2,0.3,0.4,0.5,1.0} × ε∈{0.1,0.2,0.3,0.4,0.5}` 共 30 配置,逐一算 failure rate 随 SALI 的走向。
+
+| 配置 | 0–.5 | .5–1 | 1–1.5 | 1.5–2 | >2 | trend(末−首) |
+|---|---|---|---|---|---|---|
+| τ=0.1, ε=0.1 | 44.9 | 28.9 | 20.3 | 14.6 | 11.3 | −33.6 |
+| τ=0.1, ε=0.5 | 60.3 | 41.3 | 30.2 | 21.9 | 16.3 | −44.1 |
+| τ=0.5, ε=0.1 | 40.8 | 28.9 | 20.3 | 14.6 | 11.3 | −29.5 |
+| τ=0.5, ε=0.5 | 53.7 | 41.3 | 30.2 | 21.9 | 16.3 | −37.5 |
+| τ=1.0, ε=0.1 | 35.4 | 28.5 | 20.3 | 14.6 | 11.3 | −24.1 |
+| τ=1.0, ε=0.5 | 44.1 | 40.5 | 30.2 | 21.9 | 16.3 | −27.8 |
+
+**30/30 配置 trend 全为负(failure 随 cliff 单调下降),无任何单调递增配置。** 增大 τ(0.1→1)只把首桶压低、缩小落差,但**永远翻不过来**。inversion rate 同理(τ=0.5/ε=0.1:34.3→23.4→15.9→11.7→9.3)。
+
+### 尝试 2 — 控制变量:固定真值 gap |dT|,按相似度 d
+怀疑 (1) 被"高 SALI 桶天然 |dT| 大"混淆,于是固定 |dT| 区间、改变 d(d 越小=越相似=越像 cliff)。inversion%(ε=0.1):
+
+| 固定 \|dT\| | d=1(最像) | d=3 | d=5(最不像) |
+|---|---|---|---|
+| [1,2) | 25 | 29 | 36 |
+| [2,3) | 14 | 17 | 29 |
+
+**固定 gap 时,越相似(d 越小)inversion 反而越低**——与 H 相反(越像 cliff 排得越对)。
+
+### 尝试 3 — 分层:先按 |dT| 切 cluster,cluster 内再按 SALI 分桶
+用户提议的设计,把 gap 摁住后在 cluster 内看 SALI。τ=0.5, ε=0.3,inversion%:
+
+| \|dT\| cluster | SALI 0–.5 | .5–1 | 1–1.5 | 1.5–2 | 2–3 |
+|---|---|---|---|---|---|
+| [1,2) | 32 | 21 | 19 | 16 | — |
+| [2,3) | 26 | 18 | 15 | — | 11 |
+| [3,5) | 15 | 15 | 10 | 10 | 10 |
+| ≥5 | 15 | 7 | 5 | 6 | 5 |
+
+**每个 cluster 内部,SALI 越高 inversion 越低**——再次与 H 相反。
+
+### 尝试 4 — 只取 d=1(SALI≡|dT|)
+| \|dT\|(=SALI) | n | capture | inv%(ε.1/.5) | fail%(ε.1/.5) |
+|---|---|---|---|---|
+| 0–.5 | 3029 | 2.96 | 43/22 | 56/77 |
+| 1–1.5 | 1271 | 0.78 | 26/13 | 35/53 |
+| 2–3 | 998 | 0.57 | 14/8 | 19/34 |
+| >3 | 1002 | 0.53 | 12/8 | 16/23 |
+
+inv/fail 随 SALI **下降**(43%→12%);只有 **capture 单调崩塌(2.96→0.53)**。
+
+### 尝试 5 — 最苛刻:single-site & d=1(同位点换 AA,7106 对)
+| \|dT\|(=SALI) | n | capture | inv%(ε.1/.5) | fail%(ε.1/.5) |
+|---|---|---|---|---|
+| 0–.5 | 2274 | 3.10 | 43/23 | 56/76 |
+| 1–1.5 | 1006 | 0.79 | 27/14 | 37/53 |
+| 2–3 | 760 | 0.60 | 16/9 | 21/34 |
+| >3 | 787 | 0.54 | 13/9 | 16/23 |
+
+与尝试 4 同型:排序类**下降**,capture **崩塌(3.10→0.54)**。
+
+### 尝试 6 — 同位点组内 ranking Spearman vs 真值 range
+同位点(同 complex 同 site)、k≥3 个不同 AA 的组(133 组),组内 Spearman(真值 vs 预测)对照组内真值 ddG range(=cliff 严重度;range 越大本应越好排、Spearman 应→1):
+
+| 真值 range | n | within-group Spearman(mean) | <0 占比 | capture(pred_std/true_std) |
+|---|---|---|---|---|
+| 0–1 | 29 | 0.31 | 34% | 1.54 |
+| 1–2 | 36 | 0.13 | 33% | 0.94 |
+| 2–3 | 23 | 0.42 | 17% | 0.76 |
+| 3–4 | 10 | 0.43 | 10% | 0.70 |
+| >4 | 35 | 0.62 | 3% | 0.72 |
+
+整体 within-group Spearman mean 0.37 / median 0.50 / **21% 为负**。随 range 增大,Spearman **总体上升**(0.31→0.62),capture **下降**(1.54→0.72)。
+
+### 统一原因(数学必然,非"没调好参数")
+**排序/符号是否正确,只取决于真值 gap |dT| 的可分辨性;gap 越大越容易排对。** 而 cliff 的本质就是"真值差大"
+(高 SALI;或固定 gap 时小 d 把效应集中到一个清晰的单点突变)——**所以"越像 cliff"恒等于"真值差越清晰",
+排序只会更容易,绝不可能随 cliff 严重度变差**。这与 Pearson/Spearman 随 SALI 上升同源,都是 gap 大小的内禀效应。
+
+### 结论
+- ❌ **任何基于排序/符号的指标都无法支撑 H**(6 角度全证伪;数学上不可能)。
+- ✅ **唯一随 cliff 严重度单调恶化的是「幅度」**:capture↓(同位点 1.5→0.5)、RMSE↑(见 §4.1)、effect 被压扁。
+- 🔎 **诚实推论**:cliff 对 **ranking 口径的 effect prediction 影响很小**(cliff 甚至是 ranking 里最容易的部分);
+  模型的 ranking 短板是**通用上限**(per-interface ~0.33、同位点 ~0.37),与 cliff 严重度无单调关系。
+  cliff 真正咬得动的是 **magnitude / calibration**(绝对 ddG、阈值/工程任务),应把 motivation 定位到该轴,而非 ranking。
