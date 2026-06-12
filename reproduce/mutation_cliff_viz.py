@@ -145,50 +145,75 @@ def perif(d,gcol,xc,yc):
     f=lambda v:(np.nanmean(v) if n>=MINIF else np.nan)
     return f(pe),f(sp),f(rm),n
 
-BW=0.1; TOP=4.0
+BW=0.01; TOP=2.0; HIX=2.05      # [0,2) step=0.01 细桶 + 一个 >2 聚合点(画在 x=2.05)
 fedges=np.round(np.arange(0,TOP+1e-9,BW),2); ctr=fedges[:-1]+BW/2
 P["fb"]=pd.cut(P.SALI,fedges,labels=False,right=False)
 groups={int(k):v for k,v in P.dropna(subset=["fb"]).groupby("fb")}
+HI=P[P.SALI>=TOP]               # >2 聚合桶
 n=len(ctr)
 mt=np.full(n,np.nan); mp=np.full(n,np.nan); mdt=np.full(n,np.nan); mdp=np.full(n,np.nan)
 res={k:{m:np.full(n,np.nan) for m in "PSR"} for k in "abcd"}
+def metrics_of(q):
+    out={}
+    out["a"]=(safe(pearsonr,q.true_jump,q.pred_jump),safe(spearmanr,q.true_jump,q.pred_jump),rmse(q.true_jump,q.pred_jump))
+    out["b"]=perif(q,"PDB","true_jump","pred_jump")[:3]
+    ids=pd.unique(pd.concat([q.iA,q.iB])); M=agg.loc[ids,["Name","ddG","ddG_pred"]]
+    out["c"]=(safe(pearsonr,M.ddG,M.ddG_pred),safe(spearmanr,M.ddG,M.ddG_pred),rmse(M.ddG,M.ddG_pred))
+    out["d"]=perif(M,"Name","ddG","ddG_pred")[:3]
+    return out,M
 for i in range(n):
     q=groups.get(i)
     if q is None or len(q)<MINN: continue
     mt[i]=q.absT.mean(); mp[i]=q.absP.mean(); mdt[i]=q.absT.median(); mdp[i]=q.absP.median()
-    res["a"]["P"][i]=safe(pearsonr,q.true_jump,q.pred_jump); res["a"]["S"][i]=safe(spearmanr,q.true_jump,q.pred_jump); res["a"]["R"][i]=rmse(q.true_jump,q.pred_jump)
-    bP,bS,bR,_=perif(q,"PDB","true_jump","pred_jump"); res["b"]["P"][i]=bP; res["b"]["S"][i]=bS; res["b"]["R"][i]=bR
-    ids=pd.unique(pd.concat([q.iA,q.iB])); M=agg.loc[ids,["Name","ddG","ddG_pred"]]
-    res["c"]["P"][i]=safe(pearsonr,M.ddG,M.ddG_pred); res["c"]["S"][i]=safe(spearmanr,M.ddG,M.ddG_pred); res["c"]["R"][i]=rmse(M.ddG,M.ddG_pred)
-    dP,dS,dR,_=perif(M,"Name","ddG","ddG_pred"); res["d"]["P"][i]=dP; res["d"]["S"][i]=dS; res["d"]["R"][i]=dR
+    mo,_=metrics_of(q)
+    for k in "abcd":
+        res[k]["P"][i],res[k]["S"][i],res[k]["R"][i]=mo[k]
+hmo,HM=metrics_of(HI)           # >2 聚合
+hi_mt,hi_mp,hi_mdt,hi_mdp=HI.absT.mean(),HI.absP.mean(),HI.absT.median(),HI.absP.median()
 nval={k:int(np.sum(~np.isnan(res[k]["P"]))) for k in "abcd"}
-print(f"\n=== §4 fine bins: {n} 个(step={BW}, 0–{TOP}) | 有效点 a/b/c/d = {nval} ===")
-for i in range(0,n,5):
-    print(f"  SALI~{ctr[i]:.2f}: true {mt[i]:.2f}/pred {mp[i]:.2f} | a-RMSE {res['a']['R'][i]:.2f} c-RMSE {res['c']['R'][i]:.2f} d-RMSE {res['d']['R'][i]:.2f}")
+print(f"\n=== §4 fine bins: {n} 个(step={BW}, 0–{TOP})+>2 | 有效点 a/b/c/d = {nval} ===")
 
-# ---- §4 (i):flatten,mean 与 median 两张图 ----
-for tag,vt,vp in [("mean",mt,mp),("median",mdt,mdp)]:
-    fig,ax=plt.subplots(figsize=(5.8,3.8))
-    ax.plot(ctr,vt,c="indianred",lw=1.9,label=f"true |ΔΔΔG| ({tag})")
-    ax.plot(ctr,vp,c="steelblue",lw=1.9,label=f"predicted |ΔΔΔG| ({tag})")
+# ---- §4 (i):flatten,mean 与 median 两张图(0–2 细线 + >2 聚合点)----
+def addhi(ax,val): ax.plot([HIX],[val],marker="*",ms=12,c="k",zorder=5)
+for tag,vt,vp,hvt,hvp in [("mean",mt,mp,hi_mt,hi_mp),("median",mdt,mdp,hi_mdt,hi_mdp)]:
+    fig,ax=plt.subplots(figsize=(5.9,3.8))
+    ax.plot(ctr,vt,c="indianred",lw=1.7,label=f"true |ΔΔΔG| ({tag})")
+    ax.plot(ctr,vp,c="steelblue",lw=1.7,label=f"predicted |ΔΔΔG| ({tag})")
     ax.fill_between(ctr,vp,vt,where=~np.isnan(vt),color="orange",alpha=0.15)
+    ax.plot([HIX],[hvt],marker="*",ms=13,c="indianred"); ax.plot([HIX],[hvp],marker="*",ms=13,c="steelblue")
+    ax.axvline(TOP,ls=":",c="grey",lw=1)
+    ax.set_xlim(0,2.12); ax.set_xticks([0,0.5,1,1.5,2,HIX]); ax.set_xticklabels(["0","0.5","1","1.5","2","★>2"])
     ax.set_xlabel("SALI = cliff severity (|ΔΔΔG|/d)"); ax.set_ylabel(f"|ΔΔΔG| ({tag}, kcal/mol)")
     ax.set_title(f"(i-{tag}) predicted effect flattens as cliff grows"); ax.legend(fontsize=8)
     fig.tight_layout(); fig.savefig(os.path.join(OUT,f"adit_cliff_flatten_{tag}.png")); plt.close(fig)
 
-# ---- §4 (ii):12 指标(a/b/c/d × P/S/RMSE),fine bins ----
+# ---- §4 (ii):12 指标(a/b/c/d × P/S/RMSE),0–2 细线 + >2 聚合点 ----
 titles={"a":"(a) ΔΔΔG overall","b":"(b) ΔΔΔG per-interface","c":"(c) ΔΔG overall","d":"(d) ΔΔG per-interface"}
 fig,axes=plt.subplots(2,2,figsize=(11,7.4))
 for ax,k in zip(axes.flat,"abcd"):
-    ax.plot(ctr,res[k]["P"],"-",c="crimson",lw=1.6,label="Pearson")
-    ax.plot(ctr,res[k]["S"],"-",c="navy",lw=1.6,label="Spearman")
-    ax.set_ylim(0,1); ax.set_ylabel("correlation (↑=better)"); ax.set_title(titles[k]); ax.axhline(0,ls=":",c="grey")
-    axr=ax.twinx(); axr.plot(ctr,res[k]["R"],"-",c="darkorange",lw=1.6,label="RMSE"); axr.set_ylabel("RMSE (↓=better)")
+    ax.plot(ctr,res[k]["P"],"-",c="crimson",lw=1.4,label="Pearson")
+    ax.plot(ctr,res[k]["S"],"-",c="navy",lw=1.4,label="Spearman")
+    ax.plot([HIX],[hmo[k][0]],"*",ms=11,c="crimson"); ax.plot([HIX],[hmo[k][1]],"*",ms=11,c="navy")
+    ax.axvline(TOP,ls=":",c="grey",lw=1)
+    ax.set_ylim(0,1); ax.set_xlim(0,2.12); ax.set_xticks([0,0.5,1,1.5,2,HIX]); ax.set_xticklabels(["0",".5","1","1.5","2","★>2"])
+    ax.set_ylabel("correlation (↑=better)"); ax.set_title(titles[k]); ax.axhline(0,ls=":",c="grey")
+    axr=ax.twinx(); axr.plot(ctr,res[k]["R"],"-",c="darkorange",lw=1.4,label="RMSE"); axr.plot([HIX],[hmo[k][2]],"*",ms=11,c="darkorange")
+    axr.set_ylabel("RMSE (↓=better)")
     h1,l1=ax.get_legend_handles_labels(); h2,l2=axr.get_legend_handles_labels()
     ax.legend(h1+h2,l1+l2,fontsize=7.5,loc="center left")
     ax.set_xlabel("SALI = cliff severity")
-fig.suptitle("Per-SALI-bin (step=0.1) metrics: correlations RISE (SNR artifact), only RMSE rises=worse",fontsize=11)
+fig.suptitle("Per-SALI-bin (step=0.01, 0–2) + >2: correlations RISE (SNR artifact), only RMSE rises=worse",fontsize=11)
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"adit_cliff_metrics.png")); plt.close(fig)
+
+# ---- coarse 汇总表(md 用): 0-.5,.5-1,1-1.5,1.5-2,>2 ----
+cedges=[0,0.5,1,1.5,2,1e9]; clab=["0-.5",".5-1","1-1.5","1.5-2",">2"]
+P["cb"]=pd.cut(P.SALI,cedges,labels=clab,right=False)
+print("\n=== §4 coarse 汇总(table 用)===")
+for L in clab:
+    q=P[P.cb==L]; mo,M=metrics_of(q)
+    print(f"  {L}: n={len(q)} | true {q.absT.mean():.2f}/{q.absT.median():.2f} pred {q.absP.mean():.2f}/{q.absP.median():.2f} "
+          f"| a {mo['a'][0]:.2f}/{mo['a'][1]:.2f}/{mo['a'][2]:.2f} | b {mo['b'][0]:.2f}/{mo['b'][1]:.2f}/{mo['b'][2]:.2f} "
+          f"| c {mo['c'][0]:.2f}/{mo['c'][1]:.2f}/{mo['c'][2]:.2f} | d {mo['d'][0]:.2f}/{mo['d'][1]:.2f}/{mo['d'][2]:.2f}")
 
 # ======================= 表:diff_percent =======================
 P["diff_percent"]=(P.pred_jump-P.true_jump)/P.true_jump.replace(0,np.nan)
