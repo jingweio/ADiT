@@ -30,20 +30,7 @@
   `mutation_cliff_viz.py`(§3/§4 的分布图与 ADiT 失效分析,产物在 `mutation_analysis/`)。
 
 ## 3. 发现 1:Mutation cliff 真实存在
-### 3a. site-matched 配对对照(同位点跨 AA vs 同 AA 重测)
-noise 与 cliff 在**同一批 378 个 `(complex, site)` 位点**上算,只是 ΔΔG range 的范围不同:cliff = 同位点跨**不同替换 AA**;
-noise = 同位点**同一个 AA、跨不同次实验记录**(纯测量噪声)。
-
-| 同一批 cliff 位点上的 ΔΔG range(kcal/mol) | n | median | p90 | >2 占比 |
-|---|---|---|---|---|
-| **noise**(同位点·同 AA 重测) | 190 | 0.214 | 0.91 | 1.6% |
-| **cliff**(同位点·不同 AA) | 378 | **0.909** | 4.06 | **25.4%** |
-
-→ 完全相同的位点,换一个氨基酸引起的 ΔΔG 跨度(median 0.91、max 12.9)是同一氨基酸重测跨度(median 0.21)的
-**~4.2 倍**,>2 占比 **25.4% vs 1.6%**(差约 16×)。**是氨基酸身份在驱动 ΔΔG,不是测量误差**(图 `fig_cliff_vs_noise.png`)。
-
-### 3b. 用 cliff 指数 SALI 的三组证据
-对全部 270,608 个突变对,从分布形状、尾部、与相似度的关系三个角度看 SALI = |ΔΔΔG|/d。
+对全部 270,608 个突变对,从分布形状、尾部、与相似度的关系三个角度看 cliff 指数 **SALI = |ΔΔΔG|/d**。
 
 **Evidence 1 — SALI 的 ECDF:每突变步的大跳变占比可观,且最相似(d=1)处最陡**
 <table><tr>
@@ -87,43 +74,32 @@ noise = 同位点**同一个 AA、跨不同次实验记录**(纯测量噪声)。
   1745 对)模型只预测出 ~0.47 倍幅度,真实大跳变里仅 40% 被判为大跳变(>3 时仅 33%)。
 - **同位点排序失效(k≥3,133 组)**:组内 Spearman median 0.50、**mean 仅 0.37、21% 为负**。
 
-### 4.1 ADiT 在 cliff 上的两类失效:幅度饱和 + 幅度 capture 下降
-**(i) 按真值 |ΔΔΔG| 分桶,mean 真值 vs mean 预测 —— 预测幅度"饱和"**
-<img src="mutation_analysis/adit_jump_saturation.png" width="460">
+### 4.1 把 cliff(高 SALI)与 non-cliff(低 SALI)分开,比模型的 effect 预测
+按 cliff 指数 SALI 分桶(0–4 细分 + >4),在每桶比较模型对 mutation effect(ΔΔG 差)的预测。
 
-| 真值 \|ΔΔΔG\| 桶 | n | 真值 mean | 预测 mean | gap=真值−预测 |
+<img src="mutation_analysis/adit_cliff_failure.png" width="760">
+
+| 真值 SALI 桶(cliff 严重度) | n | 真值 \|ΔΔΔG\| mean | 预测 \|ΔΔΔG\| mean | **capture=预测/真值** |
 |---|---|---|---|---|
-| 0–0.5 | 70,281 | 0.23 | 0.82 | −0.60 |
-| 0.5–1 | 45,179 | 0.73 | 1.02 | −0.28 |
-| 1–1.5 | 31,745 | 1.24 | 1.21 | +0.03 |
-| 1.5–2 | 24,362 | 1.74 | 1.45 | +0.29 |
-| 2–3 | 36,040 | 2.47 | 1.71 | +0.76 |
-| 3–4 | 24,019 | 3.46 | 2.07 | +1.39 |
-| 4–6 | 25,737 | 4.85 | 2.88 | +1.97 |
-| >6 | 13,245 | 7.47 | 4.95 | **+2.52** |
+| 0–0.5 | 146,700 | 0.79 | 1.13 | 1.43* |
+| 0.5–1 | 60,651 | 2.43 | 1.72 | 0.71 |
+| 1–1.5 | 30,467 | 3.36 | 2.01 | 0.60 |
+| 1.5–2 | 15,801 | 4.16 | 2.61 | 0.63 |
+| 2–3 | 12,920 | 5.27 | 3.04 | 0.58 |
+| 3–4 | 2,982 | 6.44 | 3.79 | 0.59 |
+| >4 | 1,087 | 7.12 | 4.38 | 0.61 |
 
-- **小跳变 over-predict、大跳变 under-predict**:预测 mean 像被"钉"在 ~0.8–2 的区间——真值 0.2 时预测 0.8(偏大),
-  真值 7.5 时预测仅 4.9(偏小)。这是**回归到均值式的平滑**,gap 随真值跳变单调拉大到 +2.5。
+**左图(幅度 flatten)**:cliff 越严重,真值 effect 一路爬升(0.8→7.1),但**预测 effect 被压在低位**(1.1→4.4)——
+两条柱的差距越拉越大。**非 cliff(SALI<2)capture = 0.86,cliff(SALI≥2)只有 0.58**:模型只复现出 cliff 区约六成的
+effect 幅度,把悬崖"抹平"。(*0–0.5 桶 capture=1.43>1 是模型对近 0 effect 的"默认高估",非有效信号。)
 
-**(ii) 按 cliff 指数 SALI 分桶 —— 越陡的 cliff,模型 capture 的陡峭度越少**
-<img src="mutation_analysis/adit_sali_degradation.png" width="720">
+**右图(cliff 识别失败)**:在真值确为陡峭 cliff 的对里,模型把它也预测成 cliff 的比例(recall)极低——
+**SALI≥2 仅 28.8%、SALI≥3 仅 29.6%**(即**漏掉约 70% 的真实 cliff**);真值 cliff(SALI>2)的预测 SALI 中位被压到
+~1.36(真值 2.49 的一半)。**模型基本不会主动"喊出"一个 cliff。**
 
-| 真值 SALI 桶 | n | 真值 SALI mean | 预测 SALI mean | **capture=预测/真值** | Pearson† | Spearman† |
-|---|---|---|---|---|---|---|
-| 0–.25 | 90,454 | 0.12 | 0.32 | 2.75* | 0.21 | 0.14 |
-| .25–.5 | 56,246 | 0.37 | 0.38 | 1.05 | 0.48 | 0.39 |
-| .5–.75 | 36,386 | 0.62 | 0.48 | 0.77 | 0.61 | 0.55 |
-| .75–1 | 24,265 | 0.87 | 0.60 | 0.69 | 0.70 | 0.66 |
-| 1–1.5 | 30,467 | 1.23 | 0.75 | 0.61 | 0.70 | 0.69 |
-| 1.5–2 | 15,801 | 1.72 | 1.06 | 0.61 | 0.77 | 0.76 |
-| **>2** | 16,989 | 2.73 | 1.56 | **0.57** | 0.82 | 0.82 |
-
-- **capture 单调下降**:从 ~1(.25–.5 桶)跌到最陡 cliff(SALI>2)的 **0.57**——**cliff 越陡,模型越只预测出其一小部分陡峭度**。
-  这正是"模型在 cliff 上退化"的本质:**幅度压缩**。
-- *0–.25 桶 capture=2.75>1 是分母趋零的假象(真值≈0 时比值放大),无意义。
-- †**Pearson/Spearman(signed 跳变)反而随 cliff 上升**(0.21→0.82):这是**动态范围/SNR 的内禀效应**(大 cliff 桶里跳变
-  动态范围大、信噪比高),说明**方向/排序被保住**——模型"知道往哪边变、谁更大",**但严重低估变化幅度**。即:cliff 失效
-  在**幅度**而非方向。
+> 说明:若改用 signed 跳变的 **Pearson/Spearman**,会**随 cliff 反而上升**(0.37→0.83)——这是动态范围/SNR 的内禀
+> 效应(大 cliff 跳变绝对值大、易判方向),只能说明"方向/谁大谁小"被保住,**不能**用来衡量 cliff 上的预测质量。
+> cliff 失效体现在**幅度被压缩 + cliff 识别失败**,而非方向。
 
 ### 4.2 全配对的真值/预测跳变表 + 极端失配 case
 - **完整表**(270,608 对):`mutation_analysis/sali_pairs_table.csv`,列 = `PDB, site(差异位点), d, ddG_A, ddG_B,
@@ -141,13 +117,13 @@ noise = 同位点**同一个 AA、跨不同次实验记录**(纯测量噪声)。
 | 1CHO_EFG_I | I12,I14,…,I46,I7 | 11 | −0.03 | 4.23 | −4.26 | **+5.53** | −230% |
 
 - **现象**:这些对的真值跳变 4–5 kcal/mol,**ADiT 不仅低估,反而预测出方向相反、幅度相当的跳变**(diff_percent ≈ −230~−282%)。
-- **集中在蛋白酶-抑制剂界面**(1PPF / 1R0R / 1CHO 的 P1 附近热点位点);与 §3a 的同位点极端 cliff 同源。
+- **集中在蛋白酶-抑制剂界面**(1PPF / 1R0R / 1CHO 的 P1 附近热点位点)。
 - **结论**:与 §4.1 互补——平均看模型"方向多半对、幅度压缩",但在**最陡的极端 cliff 上会彻底失配(预测反向)**;
   cliff 失效**横跨多界面、多种 d,是系统现象**。
 
 ## 5. 产物
 - 数据:`skempi_per_sample_pred.csv`、`skempi_mutation_cliff_pairs.csv`、`skempi_same_site_groups.csv`、
   `skempi_cliff_pairs_SALI_top2000.csv`;**全配对表 `mutation_analysis/sali_pairs_table.csv`(270,608 行)**。
-- 图(根目录):`fig_cliff_vs_noise.png`(§3a)、`fig_jump_true_vs_pred.png`、`fig_jump_saturation.png`、`fig_absT_by_distance.png`。
-- 图(`mutation_analysis/`):`ecdf_sali_combined.png`/`ecdf_sali_by_d.png`(Evidence 1)、`qmean_sali_combined.png`/`qmean_sali_by_d.png`(Evidence 2)、`pointcloud_sali_by_d.png`(Evidence 3)、`adit_jump_saturation.png`(§4.1-i)、`adit_sali_degradation.png`(§4.1-ii)。
+- 图(`mutation_analysis/`):`ecdf_sali_combined.png`/`ecdf_sali_by_d.png`(Evidence 1)、`qmean_sali_combined.png`/`qmean_sali_by_d.png`(Evidence 2)、`pointcloud_sali_by_d.png`(Evidence 3)、`adit_cliff_failure.png`(§4.1)。
+- 图(根目录,早期版本/旁证):`fig_cliff_vs_noise.png`、`fig_jump_true_vs_pred.png`、`fig_jump_saturation.png`、`fig_absT_by_distance.png`。
 - 脚本:`mutation_cliff_analysis.py`、`mutation_cliff_extended.py`、`mutation_cliff_viz.py`。

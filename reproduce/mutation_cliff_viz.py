@@ -131,51 +131,41 @@ print("ALL:",{k:(round(v,3) if k!='n' else int(v)) for k,v in block(P.SALI).item
 print(f"corr(d, SALI): Pearson={pearsonr(P.d,P.SALI)[0]:.3f} Spearman={spearmanr(P.d,P.SALI)[0]:.3f}")
 print(f"SALI>2 占比={100*(P.SALI>2).mean():.1f}% | >3={100*(P.SALI>3).mean():.1f}% | max={P.SALI.max():.1f}")
 
-# ================= §4 fig1:|ΔΔΔG| 分桶,mean 真值 vs 预测(幅度饱和)=================
-edges=[0,0.5,1,1.5,2,3,4,6,100]
-lab=["0-.5",".5-1","1-1.5","1.5-2","2-3","3-4","4-6",">6"]
-P["bin"]=pd.cut(P.absT,edges,labels=lab,right=False)
-g1=P.groupby("bin",observed=True)
-s1=pd.DataFrame({"n":g1.size(),"true_mean":g1.absT.mean(),"pred_mean":g1.absP.mean()})
-s1["gap"]=s1.true_mean-s1.pred_mean
-print("\n=== §4 fig1: |ΔΔΔG| 分桶(mean 真值 vs 预测)===")
-print(s1.round(3).to_string())
-xs=np.arange(len(lab))
-fig,ax=plt.subplots(figsize=(5.4,3.7))
-ax.bar(xs,s1.pred_mean.values,color="steelblue",label="predicted |ΔΔΔG| (mean)")
-ax.plot(xs,s1.true_mean.values,"r--o",lw=1.4,ms=4,label="true |ΔΔΔG| (mean)")
-ax.set_xticks(xs); ax.set_xticklabels(lab,rotation=45)
-ax.set_xlabel("true |ΔΔΔG| bin (kcal/mol)"); ax.set_ylabel("|ΔΔΔG| (mean)")
-ax.set_title("Predicted jump saturates as true cliff grows\n(gap = true−pred widens)"); ax.legend(fontsize=8)
-fig.tight_layout(); fig.savefig(os.path.join(OUT,"adit_jump_saturation.png")); plt.close(fig)
-
-# ================= §4 fig2:按 SALI(cliff 陡峭度)分桶,模型退化 =================
-# 预测的 cliff 陡峭度 SALI_pred = |预测跳变| / d;capture = mean(SALI_pred)/mean(SALI_true)
+# ================= §4 ADiT 无法建模 cliff:按 SALI(cliff 严重度)分桶 =================
+# 把"发生 cliff(高 SALI)"与"未发生(低 SALI)"分开,比较模型对 mutation effect(ΔΔG 差)的预测。
 P["SALI_pred"]=P.absP/P.d
-sedges=[0,0.25,0.5,0.75,1,1.5,2,100]
-slab=["0-.25",".25-.5",".5-.75",".75-1","1-1.5","1.5-2",">2"]
+sedges=[0,0.5,1,1.5,2,3,4,1e9]
+slab=["0-.5",".5-1","1-1.5","1.5-2","2-3","3-4",">4"]
 P["sbin"]=pd.cut(P.SALI,sedges,labels=slab,right=False)
 def sstat(g):
-    pe=pearsonr(g.true_jump,g.pred_jump)[0] if g.true_jump.std()>0 and g.pred_jump.std()>0 else np.nan
-    sp=spearmanr(g.true_jump,g.pred_jump)[0]
-    return pd.Series({"n":len(g),"SALI_true":g.SALI.mean(),"SALI_pred":g.SALI_pred.mean(),
-                      "capture":g.SALI_pred.mean()/g.SALI.mean(),"pearson":pe,"spearman":sp})
-s2=P.groupby("sbin",observed=True).apply(sstat,include_groups=False)
-print("\n=== §4 fig2: SALI 分桶(capture 下降 / Pearson-Spearman 上升=SNR 假象)===")
-print(s2.round(3).to_string())
-xs2=np.arange(len(slab))
-fig,(a1,a2)=plt.subplots(1,2,figsize=(9.6,3.8))
-a1.bar(xs2,s2.SALI_pred.values,color="steelblue",label="predicted SALI (mean)")
-a1.plot(xs2,s2.SALI_true.values,"r--o",lw=1.4,ms=4,label="true SALI (mean)")
-a1.set_xticks(xs2); a1.set_xticklabels(slab,rotation=45)
-a1.set_xlabel("true SALI bin (kcal/mol per step)"); a1.set_ylabel("SALI (mean)")
-a1.set_title("Predicted cliff steepness saturates"); a1.legend(fontsize=8)
-a2.plot(xs2,s2.capture.values,"-o",c="darkorange",lw=1.9,ms=5,label="capture = pred/true SALI")
-a2.axhline(1,ls=":",c="grey")
-a2.set_xticks(xs2); a2.set_xticklabels(slab,rotation=45)
-a2.set_xlabel("true SALI bin (kcal/mol per step)"); a2.set_ylabel("magnitude capture ratio")
-a2.set_ylim(0,1.6); a2.set_title("ADiT captures less steepness on steeper cliffs"); a2.legend(fontsize=8)
-fig.tight_layout(); fig.savefig(os.path.join(OUT,"adit_sali_degradation.png")); plt.close(fig)
+    return pd.Series({"n":len(g),"true_mean":g.absT.mean(),"pred_mean":g.absP.mean(),
+                      "capture":g.absP.mean()/g.absT.mean(),
+                      "pearson":pearsonr(g.true_jump,g.pred_jump)[0],
+                      "spearman":spearmanr(g.true_jump,g.pred_jump)[0]})
+s=P.groupby("sbin",observed=True).apply(sstat,include_groups=False)
+print("\n=== §4 SALI 分桶(cliff 严重度) ===")
+print(s.round(3).to_string())
+ncap=P[P.SALI<2]; ccap=P[P.SALI>=2]
+print(f"non-cliff(SALI<2) n={len(ncap)} capture={ncap.absP.mean()/ncap.absT.mean():.3f}")
+print(f"cliff   (SALI>=2) n={len(ccap)} capture={ccap.absP.mean()/ccap.absT.mean():.3f}")
+recall={t:(P[P.SALI>=t].SALI_pred>=t).mean() for t in [1,2,3]}
+print("cliff recall(预测SALI>=t | 真值SALI>=t):",{t:round(100*r,1) for t,r in recall.items()})
+
+xs=np.arange(len(slab)); w=0.4
+fig,(a1,a2)=plt.subplots(1,2,figsize=(10.2,3.9))
+a1.bar(xs-w/2,s.true_mean.values,w,color="indianred",label="true |ΔΔΔG| (mean)")
+a1.bar(xs+w/2,s.pred_mean.values,w,color="steelblue",label="predicted |ΔΔΔG| (mean)")
+a1.set_xticks(xs); a1.set_xticklabels(slab,rotation=45)
+a1.set_xlabel("true SALI bin = cliff severity"); a1.set_ylabel("|ΔΔΔG| (mean, kcal/mol)")
+a1.set_title("ADiT flattens cliffs: predicted effect lags true"); a1.legend(fontsize=8,loc="upper left")
+axb=a1.twinx(); axb.plot(xs,s.capture.values,"k-o",lw=1.5,ms=4)
+axb.set_ylim(0,1.6); axb.axhline(1,ls=":",c="grey"); axb.set_ylabel("capture = pred/true (● line)")
+ths=[1,2,3]; rec=[100*recall[t] for t in ths]
+a2.bar([f"≥{t}" for t in ths],rec,color="darkorange")
+for i,r in enumerate(rec): a2.text(i,r+1.2,f"{r:.0f}%",ha="center",fontsize=9)
+a2.set_xlabel("true cliff threshold (SALI)"); a2.set_ylabel("% also predicted as cliff (recall)")
+a2.set_ylim(0,60); a2.set_title("ADiT flags <30% of true steep cliffs")
+fig.tight_layout(); fig.savefig(os.path.join(OUT,"adit_cliff_failure.png")); plt.close(fig)
 
 # ================= 表:删 absT/absP/pred_over_true,加 diff_percent =================
 P["diff_percent"]=(P.pred_jump-P.true_jump)/P.true_jump.replace(0,np.nan)
