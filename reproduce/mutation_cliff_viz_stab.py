@@ -121,12 +121,15 @@ print("abnormal:");[print("|",*[f"{v}" for v in r],"|") for r in show(ab,5)]
 # ===== §4.2 d=1 误差直方图 [0,5) step 0.5 + >5 (percentage) =====
 d1=P[P.d==1].copy(); d1["jerr"]=(d1.pred_jump-d1.true_jump).abs()
 print(f"\n[S4.2 d=1 jerr] n={len(d1)} median={d1.jerr.median():.2f} p90={d1.jerr.quantile(.9):.2f} >5pct={100*(d1.jerr>5).mean():.1f}%")
-hedges=[round(0.5*i,1) for i in range(11)]+[1e9]
+hedges=[round(0.5*i,1) for i in range(5)]+[1e9]   # [0,2) step 0.5 + >2
+XT=[0,1,2,3,4]; XL=["0","0.5","1","1.5",">2"]; FS=(8.8,4.6)
 hpct=100*np.histogram(d1.jerr.values,bins=hedges)[0]/len(d1); hxs=np.arange(len(hpct))
-fig,ax=plt.subplots(figsize=(7.2,3.9))
+fig,ax=plt.subplots(figsize=FS)
 ax.bar(hxs,hpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3)
-ax.set_xticks([0,2,4,6,8,10]); ax.set_xticklabels(["0","1","2","3","4",">5"])
-ax.set_xlabel("|predicted jump − true jump| (kcal/mol, d=1; bin=0.5 in [0,5], last=>5)")
+for x,v in zip(hxs,hpct): ax.text(x,v+0.5,f"{v:.1f}",ha="center",va="bottom",fontsize=11)
+ax.set_ylim(0,np.nanmax(hpct)*1.13)
+ax.set_xticks(XT); ax.set_xticklabels(XL)
+ax.set_xlabel("|predicted jump − true jump| (kcal/mol, d=1; bin=0.5 in [0,2], last=>2)")
 ax.set_ylabel("percentage of d=1 pairs (%)"); ax.set_title(f"StaB-ddG d=1 jump-error (n={len(d1)}; median={d1.jerr.median():.2f})")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"stab_d1_jumperr_hist.png")); plt.close(fig)
 # sign-flip by |error|
@@ -134,14 +137,16 @@ d1["eb"]=pd.cut(d1.jerr,hedges,labels=False,right=False)
 sf=np.full(len(hpct),np.nan)
 for k,g in d1.groupby("eb"): sf[int(k)]=100*(np.sign(g.true_jump)!=np.sign(g.pred_jump)).mean()
 print("[S4.2 signflip by err]", {i:round(v) for i,v in enumerate(sf) if not np.isnan(v)})
-fig,ax=plt.subplots(figsize=(7.2,3.9))
+fig,ax=plt.subplots(figsize=FS)
 ax.bar(hxs,sf,width=0.9,color="indianred",edgecolor="white",linewidth=0.3)
-ax.set_xticks([0,2,4,6,8,10]); ax.set_xticklabels(["0","1","2","3","4",">5"]); ax.set_ylim(0,100)
-ax.set_xlabel("|predicted jump − true jump| bin (kcal/mol, d=1)"); ax.set_ylabel("% sign-opposite within bin")
+for x,v in zip(hxs,sf):
+    if not np.isnan(v): ax.text(x,v+1.5,f"{v:.0f}",ha="center",va="bottom",fontsize=11)
+ax.set_xticks(XT); ax.set_xticklabels(XL); ax.set_ylim(0,100)
+ax.set_xlabel("|predicted jump − true jump| bin (kcal/mol, d=1; bin=0.5 in [0,2], last=>2)"); ax.set_ylabel("% sign-opposite within bin")
 ax.set_title(f"StaB-ddG d=1: sign-flip vs jump-error (n={len(d1)})")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"stab_d1_signflip_by_err.png")); plt.close(fig)
 
-# ===== §4.2 按 |true jump| 分桶 [0,5) step 0.5 + >5 =====
+# ===== §4.2 按 |true jump| 分桶 [0,2) step 0.5 + >2 =====
 tj=d1.true_jump.abs(); tb=pd.cut(tj,hedges,labels=False,right=False)
 tpct=np.full(len(hpct),np.nan); terr=np.full(len(hpct),np.nan); tflip=np.full(len(hpct),np.nan)
 for k,idx in d1.assign(_t=tb).groupby("_t").groups.items():
@@ -149,16 +154,20 @@ for k,idx in d1.assign(_t=tb).groupby("_t").groups.items():
 print("[S4.2 by |true jump|] pct:",{i:round(v,1) for i,v in enumerate(tpct) if not np.isnan(v)})
 print("  meanErr:",{i:round(v,2) for i,v in enumerate(terr) if not np.isnan(v)})
 print("  flip:",{i:round(v) for i,v in enumerate(tflip) if not np.isnan(v)})
-def _xt(ax): ax.set_xticks([0,2,4,6,8,10]); ax.set_xticklabels(["0","1","2","3","4",">5"]); ax.set_xlabel("|true jump| bin (kcal/mol, d=1)")
-fig,ax=plt.subplots(figsize=(7.4,3.9)); ax.bar(hxs,tpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3); _xt(ax)
+def _xt(ax): ax.set_xticks(XT); ax.set_xticklabels(XL); ax.set_xlabel("|true jump| bin (kcal/mol, d=1; bin=0.5 in [0,2], last=>2)")
+fig,ax=plt.subplots(figsize=FS); ax.bar(hxs,tpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3); _xt(ax)
 for x,v in zip(hxs,tpct):
-    if not np.isnan(v): ax.text(x,v+0.4,f"{v:.1f}",ha="center",va="bottom",fontsize=9)
+    if not np.isnan(v): ax.text(x,v+0.5,f"{v:.1f}",ha="center",va="bottom",fontsize=11)
 ax.set_ylim(0,np.nanmax(tpct)*1.13); ax.set_ylabel("percentage of d=1 pairs (%)"); ax.set_title(f"StaB-ddG d=1: distribution of |true jump| (n={len(d1)})")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"stab_byTrueJump_pct.png")); plt.close(fig)
-fig,ax=plt.subplots(figsize=(7.4,3.9)); ax.bar(hxs,terr,width=0.9,color="seagreen",edgecolor="white",linewidth=0.3); _xt(ax)
-ax.set_ylabel("mean |pred − true jump| (kcal/mol)"); ax.set_title("StaB-ddG d=1: error vs true cliff magnitude")
+fig,ax=plt.subplots(figsize=FS); ax.bar(hxs,terr,width=0.9,color="seagreen",edgecolor="white",linewidth=0.3); _xt(ax)
+for x,v in zip(hxs,terr):
+    if not np.isnan(v): ax.text(x,v+0.04,f"{v:.2f}",ha="center",va="bottom",fontsize=11)
+ax.set_ylim(0,np.nanmax(terr)*1.13); ax.set_ylabel("mean |pred − true jump| (kcal/mol)"); ax.set_title("StaB-ddG d=1: error vs true cliff magnitude")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"stab_byTrueJump_err.png")); plt.close(fig)
-fig,ax=plt.subplots(figsize=(7.4,3.9)); ax.bar(hxs,tflip,width=0.9,color="indianred",edgecolor="white",linewidth=0.3); _xt(ax)
+fig,ax=plt.subplots(figsize=FS); ax.bar(hxs,tflip,width=0.9,color="indianred",edgecolor="white",linewidth=0.3); _xt(ax)
+for x,v in zip(hxs,tflip):
+    if not np.isnan(v): ax.text(x,v+1.5,f"{v:.0f}",ha="center",va="bottom",fontsize=11)
 ax.set_ylim(0,100); ax.set_ylabel("% sign-opposite within bin"); ax.set_title("StaB-ddG d=1: sign-flip vs true cliff magnitude")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"stab_byTrueJump_signflip.png")); plt.close(fig)
 
