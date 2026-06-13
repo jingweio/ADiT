@@ -178,6 +178,7 @@ mean 1.19 / median 0.85 / p90 2.61 / p99 5.83;**32.7% 的对 <0.5(预测准),但
 - 图(`mutation_analysis/`): `ecdf_sali_combined.png`/`ecdf_sali_by_d.png`(Evidence 1)、`qmean_sali_combined.png`/`qmean_sali_by_d.png`(Evidence 2)、`pointcloud_sali_by_d.png`(Evidence 3)、`adit_cliff_flatten_mean.png`/`adit_cliff_flatten_median.png`(§4.1-i)、`adit_cliff_rmse_dddg.png`/`adit_cliff_rmse_ddg.png`(§4.1-ii)、`d1_jumperr_hist.png`(§4.2)。
 - 图(根目录,补充旁证,均为全量不采样口径): `fig_cliff_vs_noise.png`、`fig_jump_true_vs_pred.png`、`fig_jump_saturation.png`、`fig_absT_by_distance.png`。
 - 脚本: `mutation_cliff_analysis.py`、`mutation_cliff_extended.py`、`mutation_cliff_viz.py`。
+- StaB-ddG 对照(§7): 输入 `stab_eval_skempi_test.csv`；脚本 `mutation_cliff_viz_stab.py`；图 `mutation_analysis_stab/`。
 
 ## 6. 证伪记录: "cliff 越严重 → 排序/二分类表现越差"——多角度尝试均失败
 **背景**: mutation effect prediction 的主评测是 **affinity ranking**,所以我们曾想证明假设
@@ -270,3 +271,86 @@ inv/fail 随 SALI **下降**(42%→12%);只有 **capture 单调崩塌(2.99→0.5
 - 🔎 **诚实推论**: cliff 对 **ranking 口径的 effect prediction 影响很小**(cliff 甚至是 ranking 里最容易的部分);
   模型的 ranking 短板是**通用上限**(per-interface ~0.33、同位点 ~0.37),与 cliff 严重度无单调关系。
   cliff 真正咬得动的是 **magnitude / calibration**(绝对 ddG、阈值/工程任务),应把 motivation 定位到该轴,而非 ranking。
+
+## 7. 对照：StaB-ddG 上复刻 §4 全套分析（SKEMPIv2 test split）
+把 §4 对 ADiT 做的全套 cliff 分析，在 **StaB-ddG**(ProteinMPNN-based、专用 stability 模型)上原样跑一遍。
+数据：`reproduce/stab_eval_skempi_test.csv`(StaB-ddG fine-tuned 在 SKEMPIv2 **test split** 上的 eval；
+**1491 mutations / 81 complexes / 43,111 对 / d=1 1123 对**；ddG 为 StaB 约定；StaB 仅有该 split，分析即在其上)。
+口径与 §4 完全一致(全量配对、SALI=|ΔΔΔG|/d、per-interface K≥10)。脚本 `mutation_cliff_viz_stab.py`，图存 `mutation_analysis_stab/`。
+StaB-ddG overall(per-mutant)：**Pearson 0.526 / Spearman 0.532 / RMSE 1.728**(与论文 Table 7 ~0.53 一致)。
+
+### 7.1 StaB-ddG 同样把 cliff 压扁、RMSE 随 cliff 上升
+
+**(i) 幅度 flatten**
+<table><tr>
+<td><img src="mutation_analysis_stab/stab_flatten_mean.png" width="420"></td>
+<td><img src="mutation_analysis_stab/stab_flatten_median.png" width="420"></td>
+</tr></table>
+
+| SALI 桶 | n | 真值 mean | 预测 mean | 真值 median | 预测 median |
+|---|---|---|---|---|---|
+| 0–0.5 | 21,339 | 0.84 | 1.55 | 0.70 | 0.96 |
+| 0.5–1 | 13,213 | 2.43 | 1.74 | 2.25 | 1.23 |
+| 1–1.5 | 5,724 | 3.64 | 2.02 | 3.48 | 1.60 |
+| 1.5–2 | 1,839 | 4.28 | 1.98 | 4.00 | 1.61 |
+| >2 | 996 | 5.15 | 2.16 | 4.85 | 1.76 |
+
+> StaB-ddG **同样 flatten**：真值 effect 爬到 5.15，预测压在 ~2.0(>2 桶 capture ≈ 0.50，与 ADiT 同型、甚至更扁)；小 SALI 处亦"默认高估"。
+
+**(ii) RMSE 随 cliff 严重度上升**
+<table><tr>
+<td><img src="mutation_analysis_stab/stab_rmse_dddg.png" width="420"></td>
+<td><img src="mutation_analysis_stab/stab_rmse_ddg.png" width="420"></td>
+</tr></table>
+
+| SALI 桶 | ΔΔΔG overall | ΔΔΔG per-iface | ΔΔG overall | ΔΔG per-iface |
+|---|---|---|---|---|
+| 0–0.5 | 2.21 | 1.19 | 1.67 | 1.28 |
+| 0.5–1 | 2.30 | 1.66 | 1.67 | 1.30 |
+| 1–1.5 | 2.56 | 2.04 | 1.72 | 1.41 |
+| 1.5–2 | 3.03 | 2.81 | 1.89 | 1.68 |
+| >2 | 3.56 | 3.53 | 2.02 | 2.11 |
+
+> 四条 RMSE **全随 cliff 单调上升**(ΔΔΔG-overall 2.21→3.56、ΔΔG-per-iface 1.28→2.11)，与 ADiT(§4.1)同型。
+
+### 7.2 d=1 极端 case 与误差分布：与 ADiT 同型
+
+**正常 5 例(同位点换 AA，真值跳变小、预测贴合)：**
+| PDB | 位点 | 突变 A | 突变 B | ddG_A | ddG_B | 真值跳变 | 预测跳变 | 跳变绝对差 |
+|---|---|---|---|---|---|---|---|---|
+| 1AO7_ABC_DE | D94 | S→T | S→A | 0.49 | 0.47 | +0.02 | +0.29 | 0.27 |
+| 1B41_A_B | B27 | R→Y | R→F | −2.40 | −2.11 | −0.29 | −0.19 | 0.10 |
+| 1C1Y_A_B | B11 | K→A | K→E | −1.11 | −0.89 | −0.22 | −0.16 | 0.06 |
+| 1FSS_A_B | B27 | R→M | R→F | −2.66 | −2.44 | −0.23 | −0.27 | 0.04 |
+| 1JTG_A_B | A85 | E→G | E→V | 0.91 | 0.67 | +0.24 | +0.22 | 0.02 |
+
+**不正常 5 例(真值跳变大 = cliff，预测严重失配)：**
+| PDB | 位点 | 突变 A | 突变 B | ddG_A | ddG_B | 真值跳变 | 预测跳变 | 跳变绝对差 |
+|---|---|---|---|---|---|---|---|---|
+| 1JTG_A_B | A85 | E→A | E→G | −4.06 | 0.91 | **−4.97** | **−0.17** | **4.80** |
+| 1AO7_ABC_DE | D28 | G→I | G→R | 0.28 | −2.32 | **+2.60** | **−1.30** | **3.90** |
+| 1Z7X_W_X | W434 | Y→F | Y→A | −0.12 | −5.95 | **+5.83** | **+2.85** | **2.98** |
+| 2G2U_A_B | A79 | D→E | D→K | 4.40 | 0.45 | **+3.94** | **+1.23** | **2.71** |
+| 4G0N_A_B | B31 | K→E | K→A | −5.06 | −2.20 | **−2.86** | **−0.31** | **2.55** |
+
+> 与 ADiT(§4.2)同型：同位点换 AA 真值差 3–5 kcal/mol，StaB-ddG 同样把跳变压扁到接近 0(如 1JTG E→A/E→G 真值 −4.97、预测 −0.17)或判反(1AO7 G→I/G→R 真值 +2.60、预测 −1.30)。
+
+**d=1 误差分布 + 符号相反 + 按 |真值跳变| 分桶([0,5) 间隔 0.5 + >5)：**
+<table><tr>
+<td><img src="mutation_analysis_stab/stab_d1_jumperr_hist.png" width="300"></td>
+<td><img src="mutation_analysis_stab/stab_d1_signflip_by_err.png" width="300"></td>
+</tr></table>
+<table><tr>
+<td><img src="mutation_analysis_stab/stab_byTrueJump_pct.png" width="300"></td>
+<td><img src="mutation_analysis_stab/stab_byTrueJump_err.png" width="300"></td>
+<td><img src="mutation_analysis_stab/stab_byTrueJump_signflip.png" width="300"></td>
+</tr></table>
+
+> - d=1 误差(n=1123)：median **0.81**、p90 2.58、>5 仅 1.3%——与 ADiT(median 0.85)几乎一致。
+> - 符号相反占比**随 |误差| 上升**(21%→~45–60%)、**随 |真值跳变| 下降**(46%→~14%)——与 ADiT 同型(方向失误集中在大误差，但不随真值 cliff 严重度递增)。
+> - 按 |真值跳变| 分桶：mean 误差 **0.59→4.97 单调上升**;占比向小跳变集中(>5 仅 2%)。
+
+### 7.3 结论（一针见血）
+- **StaB-ddG 也有 cliff 失效**：同样把 cliff 压扁(>2 桶 capture ≈ 0.50)、RMSE 随 cliff 单调上升、d=1 大跳变上严重失配/判反——**与 ADiT 完全同型**。
+- **排序类指标同样不随 cliff 严重度变差**(gap 越大越好排，数学必然，见 §6)。
+- ⇒ **cliff-flattening / magnitude 失效是当前 ΔΔG 模型的共性问题，并非 ADiT 独有**：专用 StaB-ddG 虽 overall 排序更强(per-iface Spearman 0.45 vs ADiT 0.28)，但在 **magnitude/cliff 轴上同样压扁**。这进一步把 motivation 指向 **cliff-aware 的幅度/校准建模**(对整个领域成立)。
