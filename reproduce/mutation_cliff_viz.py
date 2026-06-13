@@ -280,7 +280,7 @@ def _xt(ax):
 fig,ax=plt.subplots(figsize=(7.6,3.9))
 ax.bar(txs,tpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3); _xt(ax)
 for x,v in zip(txs,tpct):
-    if not np.isnan(v): ax.text(x,v+0.4,f"{v:.1f}",ha="center",va="bottom",fontsize=6.5)
+    if not np.isnan(v): ax.text(x,v+0.4,f"{v:.1f}",ha="center",va="bottom",fontsize=9)
 ax.set_ylim(0,np.nanmax(tpct)*1.12)
 ax.set_ylabel("percentage of d=1 pairs (%)")
 ax.set_title(f"d=1: distribution of |true jump| (n={len(d1e)})")
