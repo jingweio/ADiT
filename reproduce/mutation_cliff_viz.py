@@ -242,7 +242,7 @@ ax.set_ylabel("percentage of d=1 pairs (%)")
 ax.set_title(f"d=1 jump-prediction error (n={len(d1e)}; median={d1e.jerr.median():.2f}, p90={d1e.jerr.quantile(.9):.2f}, >5={100*(d1e.jerr>5).mean():.1f}%)")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_jumperr_hist.png")); plt.close(fig)
 
-# 同一分桶({0~4 by 0.1}∪{>4},按 |pred−true| 误差):每桶内 真值/预测跳变 符号相反的占比
+# 同一分桶(与上图一致,按 |pred−true| 误差):每桶内 真值/预测跳变 符号相反的占比
 d1e["ebin"]=pd.cut(d1e.jerr,hedges,labels=False,right=False)
 flip=np.full(len(hpct),np.nan); fn=np.zeros(len(hpct),dtype=int)
 for k,g in d1e.groupby("ebin"):
@@ -257,3 +257,40 @@ ax.set_xlabel("|predicted jump − true jump| bin (kcal/mol, d=1; 0.5 in [0,5], 
 ax.set_ylabel("% sign-opposite within bin"); ax.set_ylim(0,100)
 ax.set_title(f"d=1: fraction of sign-flipped pairs vs jump-error magnitude (n={len(d1e)})")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_signflip_by_err.png")); plt.close(fig)
+
+# ===== §4.2 新增:按 |true jump| 分桶({0~5 by 0.5}∪{>5}, d=1)的三张图 =====
+tj=d1e.true_jump.abs()
+tedges=[round(0.5*i,1) for i in range(11)]+[1e9]   # 0,0.5,...,5.0, >5
+tb=pd.cut(tj,tedges,labels=False,right=False)
+nb=len(tedges)-1
+tpct=np.full(nb,np.nan); terr=np.full(nb,np.nan); tflip=np.full(nb,np.nan); tn=np.zeros(nb,int)
+for k,idx in d1e.assign(_tb=tb).groupby("_tb").groups.items():
+    k=int(k); g=d1e.loc[idx]; tn[k]=len(g)
+    tpct[k]=100*len(g)/len(d1e)
+    terr[k]=(g.pred_jump-g.true_jump).abs().mean()
+    tflip[k]=100*(np.sign(g.true_jump)!=np.sign(g.pred_jump)).mean()
+txs=np.arange(nb)
+print("\n=== d=1 按 |true jump| 分桶 ===")
+for i in range(nb):
+    if tn[i]: print(f"  {tedges[i]:.1f}{'+' if i==nb-1 else f'-{tedges[i+1]:.1f}'}: n={tn[i]} pct={tpct[i]:.1f}% meanErr={terr[i]:.2f} flip={tflip[i]:.0f}%")
+def _xt(ax):
+    ax.set_xticks([0,2,4,6,8,10]); ax.set_xticklabels(["0","1","2","3","4",">5"])
+    ax.set_xlabel("|true jump| bin (kcal/mol, d=1; 0.5 in [0,5], last bar = >5)")
+# 图1:样本占比
+fig,ax=plt.subplots(figsize=(7.2,3.9))
+ax.bar(txs,tpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3); _xt(ax)
+ax.set_ylabel("percentage of d=1 pairs (%)")
+ax.set_title(f"d=1: distribution of |true jump| (n={len(d1e)})")
+fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_byTrueJump_pct.png")); plt.close(fig)
+# 图2:每桶 mean |pred-true|
+fig,ax=plt.subplots(figsize=(7.2,3.9))
+ax.bar(txs,terr,width=0.9,color="seagreen",edgecolor="white",linewidth=0.3); _xt(ax)
+ax.set_ylabel("mean |pred jump − true jump| (kcal/mol)")
+ax.set_title(f"d=1: prediction error grows with true cliff magnitude")
+fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_byTrueJump_err.png")); plt.close(fig)
+# 图3:每桶 符号相反占比
+fig,ax=plt.subplots(figsize=(7.2,3.9))
+ax.bar(txs,tflip,width=0.9,color="indianred",edgecolor="white",linewidth=0.3); _xt(ax)
+ax.set_ylabel("% sign-opposite within bin"); ax.set_ylim(0,100)
+ax.set_title(f"d=1: sign-flip fraction vs true cliff magnitude")
+fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_byTrueJump_signflip.png")); plt.close(fig)
