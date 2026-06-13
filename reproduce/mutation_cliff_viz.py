@@ -229,17 +229,17 @@ print(ext[["PDB","site","d","ddG_A","ddG_B","true_jump","pred_jump","diff_percen
 d1e=P[P.d==1].copy(); d1e["jerr"]=(d1e.pred_jump-d1e.true_jump).abs()
 print(f"\n=== d=1 |pred_jump−true_jump| 分布: n={len(d1e)} range[{d1e.jerr.min():.2f},{d1e.jerr.max():.2f}] "
       f"mean={d1e.jerr.mean():.2f} median={d1e.jerr.median():.2f} p90={d1e.jerr.quantile(.9):.2f} p99={d1e.jerr.quantile(.99):.2f} ===")
-# 分桶:[0,4) step=0.5(8 桶)+ 一个 >4 桶;y 轴为占比(%)
-hedges=[round(0.5*i,1) for i in range(9)]+[1e9]
+# 分桶:[0,5) step=0.5(10 桶)+ 一个 >5 桶;y 轴为占比(%)
+hedges=[round(0.5*i,1) for i in range(11)]+[1e9]
 hcnt=np.histogram(d1e.jerr.values,bins=hedges)[0]
 hpct=100*hcnt/len(d1e)
 hxs=np.arange(len(hpct))
-fig,ax=plt.subplots(figsize=(7.0,3.9))
+fig,ax=plt.subplots(figsize=(7.2,3.9))
 ax.bar(hxs,hpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3)
-ax.set_xticks([0,2,4,6,8]); ax.set_xticklabels(["0","1","2","3",">4"])
-ax.set_xlabel("|predicted jump − true jump| (kcal/mol, d=1; bin=0.5 in [0,4], last bar = >4)")
+ax.set_xticks([0,2,4,6,8,10]); ax.set_xticklabels(["0","1","2","3","4",">5"])
+ax.set_xlabel("|predicted jump − true jump| (kcal/mol, d=1; bin=0.5 in [0,5], last bar = >5)")
 ax.set_ylabel("percentage of d=1 pairs (%)")
-ax.set_title(f"d=1 jump-prediction error (n={len(d1e)}; median={d1e.jerr.median():.2f}, p90={d1e.jerr.quantile(.9):.2f}, >4={100*(d1e.jerr>4).mean():.1f}%)")
+ax.set_title(f"d=1 jump-prediction error (n={len(d1e)}; median={d1e.jerr.median():.2f}, p90={d1e.jerr.quantile(.9):.2f}, >5={100*(d1e.jerr>5).mean():.1f}%)")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_jumperr_hist.png")); plt.close(fig)
 
 # 同一分桶({0~4 by 0.1}∪{>4},按 |pred−true| 误差):每桶内 真值/预测跳变 符号相反的占比
@@ -252,8 +252,8 @@ for i in range(len(flip)):
     if fn[i]: print(f"  {hedges[i]:.1f}{'+' if i==len(flip)-1 else f'–{hedges[i+1]:.1f}'}: n={fn[i]} flip={flip[i]:.0f}%")
 fig,ax=plt.subplots(figsize=(8.6,3.9))
 ax.bar(hxs,flip,width=0.9,color="indianred",edgecolor="white",linewidth=0.3)
-ax.set_xticks([0,2,4,6,8]); ax.set_xticklabels(["0","1","2","3",">4"])
-ax.set_xlabel("|predicted jump − true jump| bin (kcal/mol, d=1; 0.5 in [0,4], last bar = >4)")
+ax.set_xticks([0,2,4,6,8,10]); ax.set_xticklabels(["0","1","2","3","4",">5"])
+ax.set_xlabel("|predicted jump − true jump| bin (kcal/mol, d=1; 0.5 in [0,5], last bar = >5)")
 ax.set_ylabel("% sign-opposite within bin"); ax.set_ylim(0,100)
 ax.set_title(f"d=1: fraction of sign-flipped pairs vs jump-error magnitude (n={len(d1e)})")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_signflip_by_err.png")); plt.close(fig)
