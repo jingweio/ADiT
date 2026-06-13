@@ -121,8 +121,8 @@ print("abnormal:");[print("|",*[f"{v}" for v in r],"|") for r in show(ab,5)]
 # ===== §4.2 d=1 误差直方图 [0,5) step 0.5 + >5 (percentage) =====
 d1=P[P.d==1].copy(); d1["jerr"]=(d1.pred_jump-d1.true_jump).abs()
 print(f"\n[S4.2 d=1 jerr] n={len(d1)} median={d1.jerr.median():.2f} p90={d1.jerr.quantile(.9):.2f} >5pct={100*(d1.jerr>5).mean():.1f}%")
-hedges=[round(0.5*i,1) for i in range(5)]+[1e9]   # [0,2) step 0.5 + >2
-XT=[0,1,2,3,4]; XL=["0","0.5","1","1.5",">2"]; FS=(8.8,4.6)
+hedges=[round(0.5*i,1) for i in range(9)]+[1e9]   # [0,4) step 0.5 + >4
+XT=[0,2,4,6,8]; XL=["0","1","2","3",">4"]; FS=(8.8,4.6)
 hpct=100*np.histogram(d1.jerr.values,bins=hedges)[0]/len(d1); hxs=np.arange(len(hpct))
 fig,ax=plt.subplots(figsize=FS)
 ax.bar(hxs,hpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3)
