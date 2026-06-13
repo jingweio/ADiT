@@ -276,9 +276,12 @@ for i in range(nb):
 def _xt(ax):
     ax.set_xticks([0,2,4,6,8,10]); ax.set_xticklabels(["0","1","2","3","4",">5"])
     ax.set_xlabel("|true jump| bin (kcal/mol, d=1; 0.5 in [0,5], last bar = >5)")
-# 图1:样本占比
-fig,ax=plt.subplots(figsize=(7.2,3.9))
+# 图1:样本占比(每根柱标注百分比)
+fig,ax=plt.subplots(figsize=(7.6,3.9))
 ax.bar(txs,tpct,width=0.9,color="steelblue",edgecolor="white",linewidth=0.3); _xt(ax)
+for x,v in zip(txs,tpct):
+    if not np.isnan(v): ax.text(x,v+0.4,f"{v:.1f}",ha="center",va="bottom",fontsize=6.5)
+ax.set_ylim(0,np.nanmax(tpct)*1.12)
 ax.set_ylabel("percentage of d=1 pairs (%)")
 ax.set_title(f"d=1: distribution of |true jump| (n={len(d1e)})")
 fig.tight_layout(); fig.savefig(os.path.join(OUT,"d1_byTrueJump_pct.png")); plt.close(fig)
