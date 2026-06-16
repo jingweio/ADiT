@@ -15,7 +15,9 @@ JournalStorage(放 /ibex 共享盘,适合并行写)协作同一个 study(TPE)。
 失败(如大 truncation OOM)→ 返回 -1.0 并记 fail 原因,让 TPE 自行避开。
 
 搜索空间(范围/步长见下方 suggest_*):truncation_size / lr / dropout / weight_decay /
-batch_size / scheduler.patience。epochs 用早停自适应(max_epochs 封顶)。
+scheduler.patience。epochs 用早停自适应(max_epochs 封顶)。batch_size 不进搜索:每个 trial
+从 8 起遇 CUDA OOM 自动减半(8→4→2→1)取最大可行值(因 trunc×batch 显存耦合,trunc256×8 在 80G a100 也 OOM),
+记入 user_attr['effective_batch_size']。
 
 用法(单 worker):
   python reproduce/optuna_retune.py --study-name adit_M_retune \
@@ -91,7 +93,6 @@ def build_objective(args):
         lr = trial.suggest_float("lr", 1e-6, 3e-4, log=True)
         dropout = trial.suggest_categorical("dropout", [0.0, 0.1, 0.2])
         wd = trial.suggest_categorical("weight_decay", [0.0, 1e-4, 1e-2])
-        bs = trial.suggest_categorical("batch_size", [4, 8])
         sched_pat = trial.suggest_categorical("scheduler_patience", [5, 10])
 
         tag = f"retuneM_w{args.worker_id}_t{trial.number}"
@@ -106,24 +107,44 @@ def build_objective(args):
             f"++data.dataset.truncation_size={ts}",
             f"++model.net.dropout={dropout}",
         ]
-        train_cmd = ["bash", "train.sh", f"experiment={args.experiment}"] + common + [
-            f"++data.batch_size={bs}",
-            f"++model.optimizer.lr={lr}",
-            f"++model.optimizer.weight_decay={wd}",
-            f"++model.scheduler.patience={sched_pat}",
-            "++trainer.min_epochs=1", f"++trainer.max_epochs={args.max_epochs}",
-            "++callbacks.early_stopping.monitor=val/mse_loss",
-            "++callbacks.early_stopping.mode=min",
-            f"++callbacks.early_stopping.patience={args.es_patience}",
-            "++callbacks.model_checkpoint.save_last=true",
-            f"ckpt_path={args.base_ckpt}",
-            f"task_name={tag}",
-        ]
+        # 显存自适应:从 batch=8 起,遇 CUDA OOM 自动减半(8→4→2→1),保证每个 truncation 都训得起来
         t0 = time.time()
-        rc = run(train_cmd, log_path)
-        if rc != 0:
-            trial.set_user_attr("fail", f"train rc={rc}")
+        eff_bs = None
+        for bs in (8, 4, 2, 1):
+            attempt_log = os.path.join(args.work_dir, f"{tag}_bs{bs}.log")
+            if os.path.exists(attempt_log):
+                os.remove(attempt_log)
+            train_cmd = ["bash", "train.sh", f"experiment={args.experiment}"] + common + [
+                f"++data.batch_size={bs}",
+                f"++model.optimizer.lr={lr}",
+                f"++model.optimizer.weight_decay={wd}",
+                f"++model.scheduler.patience={sched_pat}",
+                "++trainer.min_epochs=1", f"++trainer.max_epochs={args.max_epochs}",
+                "++callbacks.early_stopping.monitor=val/mse_loss",
+                "++callbacks.early_stopping.mode=min",
+                f"++callbacks.early_stopping.patience={args.es_patience}",
+                "++callbacks.model_checkpoint.save_last=true",
+                f"ckpt_path={args.base_ckpt}",
+                f"task_name={tag}",
+            ]
+            rc = run(train_cmd, attempt_log)
+            if rc == 0:
+                eff_bs = bs
+                break
+            try:
+                with open(attempt_log, "rb") as lf:
+                    txt = lf.read().decode("utf-8", "ignore")
+                oom = ("OutOfMemoryError" in txt) or ("CUDA out of memory" in txt)
+            except Exception:
+                oom = False
+            if not oom:
+                trial.set_user_attr("fail", f"train rc={rc} (non-OOM, bs={bs})")
+                return -1.0
+            trial.set_user_attr(f"oom_at_bs{bs}", 1)  # OOM -> 试更小 batch
+        if eff_bs is None:
+            trial.set_user_attr("fail", "OOM even at batch=1")
             return -1.0
+        trial.set_user_attr("effective_batch_size", eff_bs)
 
         ckpts = sorted(glob.glob(os.path.join(REPO, "outputs", "*", f"{tag}_*", "checkpoints", "last.ckpt")),
                        key=os.path.getmtime)
@@ -137,7 +158,7 @@ def build_objective(args):
             f"++model.save_file={trial_pkl}",
             f"ckpt_path={last_ckpt}",
         ]
-        rc = run(test_cmd, log_path)
+        rc = run(test_cmd, os.path.join(args.work_dir, f"{tag}_test.log"))
         if rc != 0 or not os.path.exists(trial_pkl):
             trial.set_user_attr("fail", f"test rc={rc}")
             return -1.0
@@ -150,7 +171,7 @@ def build_objective(args):
         if not np.isfinite(mean_per):
             trial.set_user_attr("fail", f"per-iface nan (n_used={n_used})")
             return -1.0
-        print(f"[trial {trial.number}] ts={ts} lr={lr:.2e} do={dropout} wd={wd} bs={bs} "
+        print(f"[trial {trial.number}] ts={ts} lr={lr:.2e} do={dropout} wd={wd} bs={eff_bs}(auto) "
               f"schedpat={sched_pat} -> per-iface Sp(K>={args.min_k})={mean_per:.4f} "
               f"(n_used={n_used}, overall P={overall['pearson']:.3f}/S={overall['spearman']:.3f})", flush=True)
         return mean_per
