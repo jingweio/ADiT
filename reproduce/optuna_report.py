@@ -38,17 +38,19 @@ def main():
 
     valid.sort(key=lambda t: t.value, reverse=True)
     print(f"\n=== Top {min(args.top, len(valid))} trials (by val per-interface Spearman K>=10) ===")
-    hdr = f"{'rank':>4} {'trial':>5} {'perIfaceSp':>10} {'trunc':>6} {'lr':>9} {'drop':>5} {'wd':>7} {'bs':>3} {'schP':>5} {'n_used':>6} {'ovrP':>6} {'ovrS':>6} {'min':>5}"
+    hdr = f"{'rank':>4} {'trial':>5} {'perIfaceSp':>10} {'trunc':>6} {'lr':>9} {'drop':>5} {'wd':>7} {'efbs':>3} {'schP':>5} {'n_used':>6} {'ovrP':>6} {'ovrS':>6} {'min':>5}"
     print(hdr)
     for i, t in enumerate(valid[:args.top], 1):
         p = t.params
         ov = t.user_attrs.get("overall", {})
-        print(f"{i:>4} {t.number:>5} {t.value:>10.4f} {p.get('truncation_size'):>6} "
-              f"{p.get('lr'):>9.2e} {p.get('dropout'):>5} {p.get('weight_decay'):>7} "
-              f"{p.get('batch_size'):>3} {p.get('scheduler_patience'):>5} "
-              f"{t.user_attrs.get('n_used_complexes','?'):>6} "
+        eff_bs = t.user_attrs.get('effective_batch_size', '?')  # batch_size 不再是搜索维,改读自适应后的实际值
+        lr = p.get('lr')
+        print(f"{i:>4} {t.number:>5} {t.value:>10.4f} {str(p.get('truncation_size')):>6} "
+              f"{(f'{lr:.2e}' if lr is not None else '?'):>9} {str(p.get('dropout')):>5} {str(p.get('weight_decay')):>7} "
+              f"{str(eff_bs):>3} {str(p.get('scheduler_patience')):>5} "
+              f"{str(t.user_attrs.get('n_used_complexes','?')):>6} "
               f"{ov.get('pearson', float('nan')):>6.3f} {ov.get('spearman', float('nan')):>6.3f} "
-              f"{t.user_attrs.get('elapsed_min','?'):>5}")
+              f"{str(t.user_attrs.get('elapsed_min','?')):>5}")
 
     b = study.best_trial
     print(f"\n=== BEST (trial {b.number}, val per-iface Spearman K>=10 = {b.value:.4f}) ===")
