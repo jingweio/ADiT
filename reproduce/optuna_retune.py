@@ -16,7 +16,7 @@ JournalStorage(放 /ibex 共享盘,适合并行写)协作同一个 study(TPE)。
 失败(如 trunc256×8 OOM)→ 返回大 RMSE(FAIL_RMSE)并记 fail 原因,让 TPE 避开。
 
 搜索空间(见下方 suggest_*):
-  truncation_size ∈ {256,128,64,32}(bs 固定 8;256×8 可能 OOM→fail) / lr ∈ {1e-5,5e-5,1e-4,5e-4,1e-3}
+  truncation_size ∈ {160,128,64,32}(bs 固定 8;160 = 80G a100 上 bs8 实测能放下的最大档,192/200/256 均 OOM) / lr ∈ {1e-5,5e-5,1e-4,5e-4,1e-3}
   / dropout ∈ {0.0~0.5 by 0.1} / weight_decay ∈ {1e-5,5e-5,1e-4,5e-4,1e-3,5e-3,1e-2}
   / scheduler.patience ∈ {20,50,100}。epochs:max_epochs 500 封顶 + EarlyStopping patience 100。
   batch_size 固定 8(= ADiT 原模型默认),不进搜索。
@@ -95,7 +95,7 @@ FAIL_RMSE = 1e6  # 失败哨兵(目标是 minimize overall RMSE,失败→给个�
 def build_objective(args):
     def objective(trial):
         # 搜索空间(2026-06 用户敲定):bs 固定 8(原模型默认),不再自适应
-        ts = trial.suggest_categorical("truncation_size", [256, 128, 64, 32])
+        ts = trial.suggest_categorical("truncation_size", [160, 128, 64, 32])
         lr = trial.suggest_categorical("lr", [1e-5, 5e-5, 1e-4, 5e-4, 1e-3])
         dropout = trial.suggest_categorical("dropout", [0.0, 0.1, 0.2, 0.3, 0.4, 0.5])
         wd = trial.suggest_categorical("weight_decay", [1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2])
